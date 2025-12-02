@@ -1,6 +1,21 @@
 [package]
 name = "hornet2"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
+# YAML parsing
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+serde_json = "1.0"
+
+# OpenAPI parsing
+oas3 = "0.12"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+[dev-dependencies]
+# Testing
+tempfile = "3.0"

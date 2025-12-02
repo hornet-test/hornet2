@@ -1,0 +1,185 @@
+openapi: 3.0.0
+info:
+  title: User Management API
+  description: A sample API for user registration, login, and profile management
+  version: 1.0.0
+
+servers:
+  - url: https://api.example.com
+    description: Production server
+
+paths:
+  /register:
+    post:
+      operationId: registerUser
+      summary: Register a new user
+      description: Creates a new user account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - email
+                - password
+              properties:
+                username:
+                  type: string
+                  example: testuser
+                email:
+                  type: string
+                  format: email
+                  example: test@example.com
+                password:
+                  type: string
+                  format: password
+                  example: securePassword123
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: user_123
+                  username:
+                    type: string
+                    example: testuser
+                  email:
+                    type: string
+                    example: test@example.com
+        '400':
+          description: Invalid input
+        '409':
+          description: User already exists
+
+  /login:
+    post:
+      operationId: loginUser
+      summary: User login
+      description: Authenticate a user and return a token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  example: testuser
+                password:
+                  type: string
+                  format: password
+                  example: securePassword123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        example: user_123
+                      username:
+                        type: string
+                        example: testuser
+        '401':
+          description: Invalid credentials
+
+  /profile:
+    get:
+      operationId: getProfile
+      summary: Get user profile
+      description: Retrieve the authenticated user's profile
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: user_123
+                  username:
+                    type: string
+                    example: testuser
+                  email:
+                    type: string
+                    example: test@example.com
+                  createdAt:
+                    type: string
+                    format: date-time
+                    example: 2024-01-01T00:00:00Z
+        '401':
+          description: Unauthorized
+
+    put:
+      operationId: updateProfile
+      summary: Update user profile
+      description: Update the authenticated user's profile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: newemail@example.com
+                bio:
+                  type: string
+                  example: Software engineer
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: user_123
+                  username:
+                    type: string
+                    example: testuser
+                  email:
+                    type: string
+                    example: newemail@example.com
+                  bio:
+                    type: string
+                    example: Software engineer
+        '401':
+          description: Unauthorized
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
