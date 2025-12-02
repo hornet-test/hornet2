@@ -8,7 +8,7 @@
 |---|--------|-----------|--------|
 | [#001](../issues/001-openapi-arazzo-parser.md) | OpenAPI / Arazzo YAML パーサー | ✅ 完了 | 2024-12-03 |
 | [#002](../issues/002-flow-graph-generation.md) | フロー図の生成（グラフ構造への変換） | ✅ 完了 | 2024-12-03 |
-| [#003](../issues/003-web-ui-visualization.md) | Web UI での可視化 | 📋 未着手 | - |
+| [#003](../issues/003-web-ui-visualization.md) | Web UI での可視化 | ✅ 完了 | 2024-12-03 |
 | [#004](../issues/004-cli-basic-operations.md) | CLI での基本操作 | 📋 未着手 | - |
 
 ## Phase 2: テスト実行
@@ -28,6 +28,38 @@
 | [#010](../issues/010-optimization.md) | 並列実行・非同期最適化 | 📋 未着手 | - |
 
 ## 最新の成果
+
+### #003 Web UIでの可視化 ✅
+
+**実装内容**:
+- axum を使用した Web サーバー
+- Cytoscape.js によるインタラクティブなグラフ可視化
+- REST API エンドポイント (`/api/workflows`, `/api/graph/{workflow_id}`)
+- レスポンシブなUI (Vanilla JS + CSS)
+- 複数レイアウト対応 (Dagre, Breadth First, Circle, Grid)
+- ノード詳細表示パネル
+- HTTPメソッドによる色分け
+
+**API エンドポイント**:
+- `GET /` - Web UI のエントリーポイント
+- `GET /api/workflows` - ワークフロー一覧
+- `GET /api/graph/{workflow_id}` - グラフJSON取得
+- `GET /static/*` - 静的ファイル (CSS, JS)
+
+**CLI コマンド**:
+```bash
+$ cargo run -- serve tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --port 3000
+✓ Starting server on http://127.0.0.1:3000
+✓ Open http://127.0.0.1:3000 in your browser
+```
+
+**主要機能**:
+- インタラクティブなグラフ可視化
+- ノードのクリックで詳細表示
+- ズーム・パン操作
+- レイアウトアルゴリズムの切り替え
+- HTTPメソッドによる色分け (GET=青, POST=緑, DELETE=赤, etc.)
+- エッジタイプの視覚化 (Sequential, Conditional, DataDependency)
 
 ### #002 フロー図の生成 ✅
 
@@ -66,19 +98,14 @@ $ cargo run -- visualize tests/fixtures/arazzo.yaml --format json
 
 ## プロジェクト統計
 
-- **総コミット数**: 6
-- **実装済み機能**: 2/10 (20%)
+- **総コミット数**: 7
+- **実装済み機能**: 3/10 (30%)
 - **テストカバレッジ**: 29 tests
-- **コード行数**: ~3,300 LOC
+- **コード行数**: ~4,000 LOC
 
 ## 次のマイルストーン
 
-次は **#003 Web UIでの可視化** または **#004 CLIでの基本操作**に進みます。
-
-### #003 Web UI での可視化
-- axum を使った Web サーバー
-- Cytoscape.js でのグラフレンダリング
-- インタラクティブな可視化
+次は **#004 CLIでの基本操作** に進みます。
 
 ### #004 CLI での基本操作
 - clap を使った本格的な CLI

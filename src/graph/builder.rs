@@ -58,7 +58,7 @@ impl<'a> FlowGraphBuilder<'a> {
         // Note: We don't add separate edges for data dependencies since
         // the sequential edges already represent the execution order.
         // We just annotate the existing edges with data dependency information.
-        for (i, step) in self.workflow.steps.iter().enumerate() {
+        for (_i, step) in self.workflow.steps.iter().enumerate() {
             let dependencies = self.extract_data_dependencies(step);
 
             if !dependencies.is_empty() {

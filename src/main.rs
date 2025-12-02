@@ -1,10 +1,12 @@
 use hornet2::{
     graph::{builder::build_flow_graph, exporter::{export_dot, export_json}, validator::validate_flow_graph},
     loader, Result,
+    server,
 };
 use std::env;
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 2 {
@@ -14,11 +16,13 @@ fn main() -> Result<()> {
         println!("  hornet2 validate-openapi <path-to-openapi.yaml>");
         println!("  hornet2 validate-arazzo <path-to-arazzo.yaml>");
         println!("  hornet2 visualize <path-to-arazzo.yaml> [--openapi <path-to-openapi.yaml>] [--format dot|json]");
+        println!("  hornet2 serve <path-to-arazzo.yaml> [--openapi <path-to-openapi.yaml>] [--port <port>]");
         println!();
         println!("Examples:");
         println!("  hornet2 validate-openapi tests/fixtures/openapi.yaml");
         println!("  hornet2 validate-arazzo tests/fixtures/arazzo.yaml");
         println!("  hornet2 visualize tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --format dot");
+        println!("  hornet2 serve tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --port 3000");
         return Ok(());
     }
 
@@ -202,6 +206,54 @@ fn main() -> Result<()> {
                     std::process::exit(1);
                 }
             }
+
+            Ok(())
+        }
+        "serve" => {
+            if args.len() < 3 {
+                eprintln!("Error: Missing path to Arazzo file");
+                std::process::exit(1);
+            }
+            let arazzo_path = args[2].clone();
+
+            // Parse optional arguments
+            let mut openapi_path = None;
+            let mut port = 3000;
+
+            let mut i = 3;
+            while i < args.len() {
+                match args[i].as_str() {
+                    "--openapi" => {
+                        if i + 1 < args.len() {
+                            openapi_path = Some(args[i + 1].clone());
+                            i += 2;
+                        } else {
+                            eprintln!("Error: --openapi requires a path");
+                            std::process::exit(1);
+                        }
+                    }
+                    "--port" => {
+                        if i + 1 < args.len() {
+                            port = args[i + 1].parse().unwrap_or_else(|_| {
+                                eprintln!("Error: Invalid port number");
+                                std::process::exit(1);
+                            });
+                            i += 2;
+                        } else {
+                            eprintln!("Error: --port requires a number");
+                            std::process::exit(1);
+                        }
+                    }
+                    _ => {
+                        eprintln!("Unknown option: {}", args[i]);
+                        std::process::exit(1);
+                    }
+                }
+            }
+
+            let addr = format!("127.0.0.1:{}", port).parse().unwrap();
+
+            server::start_server(addr, arazzo_path, openapi_path).await?;
 
             Ok(())
         }

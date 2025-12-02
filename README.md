@@ -58,12 +58,60 @@
 - **AI との連携**を見据えた構造化データ
 - 最終的には **Rust 製高速エンジン**による省メモリ・高速実行
 
+## 🚀 クイックスタート
+
+### インストール
+
+```bash
+git clone <repository-url>
+cd hornet2
+cargo build --release
+```
+
+### 使い方
+
+#### 1. OpenAPI/Arazzo の検証
+
+```bash
+# OpenAPI 仕様の検証
+cargo run -- validate-openapi tests/fixtures/openapi.yaml
+
+# Arazzo 仕様の検証
+cargo run -- validate-arazzo tests/fixtures/arazzo.yaml
+```
+
+#### 2. フロー図の生成 (CLI)
+
+```bash
+# DOT 形式で出力
+cargo run -- visualize tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --format dot
+
+# JSON 形式で出力
+cargo run -- visualize tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --format json
+```
+
+#### 3. Web UI での可視化 ✨
+
+```bash
+# Web サーバーを起動
+cargo run -- serve tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --port 3000
+
+# ブラウザで http://localhost:3000 を開く
+```
+
+**Web UI 機能**:
+- インタラクティブなグラフ可視化（Cytoscape.js）
+- ノードのクリックで詳細表示
+- 複数レイアウト対応（階層型、円形、グリッドなど）
+- HTTPメソッドによる色分け
+- ズーム・パン操作
+
 ## 🔧 ロードマップ
 
 ### Phase 1: 可視化 (MVP)
-- [ ] OpenAPI / Arazzo YAML パーサー
-- [ ] フロー図の生成（グラフ構造への変換）
-- [ ] Web UI での可視化
+- [x] OpenAPI / Arazzo YAML パーサー ✅
+- [x] フロー図の生成（グラフ構造への変換） ✅
+- [x] Web UI での可視化 ✅
 - [ ] CLI での基本操作
 
 ### Phase 2: テスト実行
