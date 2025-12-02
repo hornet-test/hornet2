@@ -7,7 +7,7 @@
 | # | タスク | ステータス | 完了日 |
 |---|--------|-----------|--------|
 | [#001](../issues/001-openapi-arazzo-parser.md) | OpenAPI / Arazzo YAML パーサー | ✅ 完了 | 2024-12-03 |
-| [#002](../issues/002-flow-graph-generation.md) | フロー図の生成（グラフ構造への変換） | 🔜 次 | - |
+| [#002](../issues/002-flow-graph-generation.md) | フロー図の生成（グラフ構造への変換） | ✅ 完了 | 2024-12-03 |
 | [#003](../issues/003-web-ui-visualization.md) | Web UI での可視化 | 📋 未着手 | - |
 | [#004](../issues/004-cli-basic-operations.md) | CLI での基本操作 | 📋 未着手 | - |
 
@@ -29,50 +29,58 @@
 
 ## 最新の成果
 
-### #001 OpenAPI/Arazzo パーサー ✅
+### #002 フロー図の生成 ✅
 
 **実装内容**:
-- OpenAPI 3.0/3.1 のパーサー（oas3 クレート使用）
-- Arazzo 1.0.0 の完全対応データ構造
-- YAML ローダーとバリデーション機能
-- CLI コマンド（validate-openapi, validate-arazzo）
+- petgraph を使用した有向グラフ（DAG）の構築
+- ステップ間の依存関係解析（順次実行・条件分岐）
+- グラフバリデーション（循環参照チェック、トポロジカルソート）
+- DOT/JSON形式でのエクスポート
+- visualize CLIコマンドの追加
 
 **テスト結果**:
-- ✅ 単体テスト: 10/10 passed
-- ✅ 統合テスト: 6/6 passed
-- ✅ 全テスト: **16/16 passed** 🎉
+- ✅ 単体テスト: 20/20 passed (builder 2個 + validator 2個 + exporter 2個)
+- ✅ 統合テスト: 13/13 passed (arazzo 6個 + graph 7個)
+- ✅ 全テスト: **29/29 passed** 🎉
 
 **CLI 動作確認**:
 ```bash
-$ cargo run -- validate-openapi tests/fixtures/openapi.yaml
-✓ OpenAPI loaded successfully
-  Title: User Management API
-  Paths: 3
+$ cargo run -- visualize tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --format dot
+✓ Graph is valid
+# DOT format output:
+digraph "user-onboarding-flow" {
+  "register" -> "login" [style="solid"];
+  "login" -> "getProfile" [style="solid"];
+  ...
+}
 
-$ cargo run -- validate-arazzo tests/fixtures/arazzo.yaml
-✓ Arazzo loaded successfully
-  Workflows: 2
-    - user-onboarding-flow (4 steps)
-    - simple-login-flow (1 steps)
+$ cargo run -- visualize tests/fixtures/arazzo.yaml --format json
+# JSON format output with nodes and edges
 ```
 
-**ドキュメント**:
-- [実装詳細](./001-implementation-notes.md)
-- [Issue #001](../issues/001-openapi-arazzo-parser.md)
+**主要機能**:
+- FlowGraph: Arazzoワークフローのグラフ表現
+- FlowGraphBuilder: OpenAPI/Arazzoからグラフを構築
+- FlowGraphValidator: DAG検証、到達可能性チェック
+- FlowGraphExporter: Graphviz DOT / JSON形式での出力
 
 ## プロジェクト統計
 
-- **総コミット数**: 3
-- **実装済み機能**: 1/10 (10%)
-- **テストカバレッジ**: 16 tests
-- **コード行数**: ~2,000 LOC
+- **総コミット数**: 6
+- **実装済み機能**: 2/10 (20%)
+- **テストカバレッジ**: 29 tests
+- **コード行数**: ~3,300 LOC
 
 ## 次のマイルストーン
 
-次は **#002 フロー図の生成**に進みます。
+次は **#003 Web UIでの可視化** または **#004 CLIでの基本操作**に進みます。
 
-主な実装内容:
-- `petgraph` を使った有向グラフ（DAG）の構築
-- ステップ間の依存関係解析
-- DOT / JSON 形式でのエクスポート
-- グラフのバリデーション（循環参照チェック）
+### #003 Web UI での可視化
+- axum を使った Web サーバー
+- Cytoscape.js でのグラフレンダリング
+- インタラクティブな可視化
+
+### #004 CLI での基本操作
+- clap を使った本格的な CLI
+- list / validate / visualize コマンドの統合
+- 複数ワークフローの処理
