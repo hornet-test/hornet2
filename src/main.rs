@@ -42,7 +42,15 @@ async fn main() -> Result<()> {
             iterations,
         } => {
             commands::execute_convert(
-                &arazzo, &openapi, &output, &to, &workflow, &base_url, vus, &duration, iterations,
+                &arazzo,
+                &openapi,
+                output.as_deref(),
+                &to,
+                workflow.as_deref(),
+                base_url.as_deref(),
+                vus,
+                duration.as_deref(),
+                iterations,
             )?;
         }
         Commands::Run {
@@ -56,7 +64,14 @@ async fn main() -> Result<()> {
             iterations,
         } => {
             commands::execute_run(
-                &arazzo, &openapi, &engine, &workflow, &base_url, vus, &duration, iterations,
+                &arazzo,
+                &openapi,
+                &engine,
+                workflow.as_deref(),
+                base_url.as_deref(),
+                vus,
+                duration.as_deref(),
+                iterations,
             )?;
         }
     }

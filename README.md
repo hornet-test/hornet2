@@ -108,6 +108,47 @@ cargo run -- serve tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.y
 - HTTPメソッドによる色分け
 - ズーム・パン操作
 
+#### 4. k6 スクリプトへの変換 ✨
+
+```bash
+# k6 スクリプトを生成（標準出力）
+cargo run -- convert --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --to k6
+
+# ファイルに出力
+cargo run -- convert --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --to k6 --output test.js
+
+# 特定のワークフローのみ変換
+cargo run -- convert --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --to k6 --workflow user-onboarding-flow
+
+# 負荷試験オプション付き
+cargo run -- convert --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --to k6 --vus 10 --duration 30s
+```
+
+#### 5. テスト実行 ✨
+
+```bash
+# k6 を使ってテストを実行（k6 のインストールが必要）
+cargo run -- run --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --engine k6
+
+# 負荷試験オプション付き
+cargo run -- run --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --engine k6 --vus 10 --duration 30s
+```
+
+**実行結果の例**:
+```
+→ Generating test script...
+✓ k6 version: k6 v0.48.0
+→ Running tests with k6...
+
+✓ Test run completed successfully!
+
+Metrics Summary:
+  HTTP Requests: 4
+  Iterations: 1
+  Avg Response Time: 123.45ms
+  Checks: 8 passed, 0 failed
+```
+
 ## 🔧 ロードマップ
 
 ### Phase 1: 可視化 (MVP)
@@ -117,9 +158,9 @@ cargo run -- serve tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.y
 - [ ] CLI での基本操作
 
 ### Phase 2: テスト実行
-- [ ] 外部ツール（k6 など）への DSL 変換
-- [ ] テスト実行の自動化
-- [ ] 結果レポートの生成
+- [x] 外部ツール（k6）への DSL 変換 ✅
+- [x] テスト実行の自動化 ✅
+- [x] 結果レポートの生成（k6 メトリクス解析） ✅
 
 ### Phase 3: 高速エンジン化
 - [ ] Rust 製 HTTP クライアントの実装

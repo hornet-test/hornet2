@@ -145,11 +145,11 @@ pub fn run_k6_script(script_path: &Path) -> Result<TestResult, Error> {
 
 ## 成果物
 
-- [ ] `src/converters/k6.rs`: k6 スクリプト生成ロジック
-- [ ] `src/converters/mod.rs`: 変換器のトレイト定義
-- [ ] `src/runner/k6.rs`: k6 実行ロジック
-- [ ] `tests/fixtures/k6/`: 生成される k6 スクリプトのサンプル
-- [ ] CLI コマンド: `hornet2 convert --to k6`
+- [x] `src/converters/k6.rs`: k6 スクリプト生成ロジック
+- [x] `src/converters/mod.rs`: 変換器のトレイト定義
+- [x] `src/runner/k6.rs`: k6 実行ロジック
+- [x] `tests/fixtures/k6/`: 生成される k6 スクリプトのサンプル
+- [x] CLI コマンド: `hornet2 convert --to k6`
 
 ## テストケース
 

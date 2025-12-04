@@ -282,7 +282,7 @@ impl K6Converter {
         let body_code = step
             .request_body
             .as_ref()
-            .map(|body| Self::generate_request_body(body));
+            .map(Self::generate_request_body);
 
         // Add Content-Type if request body exists
         if step.request_body.is_some() {
@@ -369,18 +369,16 @@ impl K6Converter {
         }
 
         // Generate output variable extractions
-        if let Some(ref outputs) = step.outputs {
-            if let serde_json::Value::Object(map) = outputs {
-                for (name, expr) in map {
-                    if let serde_json::Value::String(expr_str) = expr {
-                        let extraction = self.generate_output_extraction(
-                            &step.step_id,
-                            name,
-                            expr_str,
-                            &response_var,
-                        );
-                        lines.push(extraction);
-                    }
+        if let Some(serde_json::Value::Object(map)) = step.outputs.as_ref() {
+            for (name, expr) in map {
+                if let serde_json::Value::String(expr_str) = expr {
+                    let extraction = self.generate_output_extraction(
+                        &step.step_id,
+                        name,
+                        expr_str,
+                        &response_var,
+                    );
+                    lines.push(extraction);
                 }
             }
         }
@@ -506,27 +504,23 @@ impl K6Converter {
 
     /// Generate workflow inputs
     fn generate_inputs(workflow: &Workflow) -> String {
-        if let Some(ref inputs) = workflow.inputs {
-            if let Some(props) = inputs.get("properties") {
-                if let serde_json::Value::Object(map) = props {
-                    let mut input_lines = Vec::new();
-                    for (name, schema) in map {
-                        let default_val = schema.get("default");
-                        let value = if let Some(def) = default_val {
-                            Self::json_to_js(def, 0)
-                        } else {
-                            match schema.get("type").and_then(|t| t.as_str()) {
-                                Some("string") => "\"\"".to_string(),
-                                Some("number") | Some("integer") => "0".to_string(),
-                                Some("boolean") => "false".to_string(),
-                                _ => "null".to_string(),
-                            }
-                        };
-                        input_lines.push(format!("    {}: {},", name, value));
+        if let Some(serde_json::Value::Object(props_map)) = workflow.inputs.as_ref().and_then(|i| i.get("properties")) {
+            let mut input_lines = Vec::new();
+            for (name, schema) in props_map {
+                let default_val = schema.get("default");
+                let value = if let Some(def) = default_val {
+                    Self::json_to_js(def, 0)
+                } else {
+                    match schema.get("type").and_then(|t| t.as_str()) {
+                        Some("string") => "\"\"".to_string(),
+                        Some("number") | Some("integer") => "0".to_string(),
+                        Some("boolean") => "false".to_string(),
+                        _ => "null".to_string(),
                     }
-                    return format!("  let inputs = {{\n{}\n  }};\n", input_lines.join("\n"));
-                }
+                };
+                input_lines.push(format!("    {}: {},", name, value));
             }
+            return format!("  let inputs = {{\n{}\n  }};\n", input_lines.join("\n"));
         }
         "  let inputs = {};\n".to_string()
     }
@@ -541,15 +535,69 @@ impl Converter for K6Converter {
         openapi: &OpenApiV3Spec,
         options: &ConvertOptions,
     ) -> Result<Self::Output> {
-        let mut scripts = Vec::new();
-
-        for workflow in &arazzo.workflows {
-            let script = self.convert_workflow(workflow, openapi, options)?;
-            scripts.push(script);
+        if arazzo.workflows.is_empty() {
+            return Ok(String::new());
         }
 
-        // Combine all workflows into one script
-        Ok(scripts.join("\n\n"))
+        // If only one workflow, generate it directly
+        if arazzo.workflows.len() == 1 {
+            return self.convert_workflow(&arazzo.workflows[0], openapi, options);
+        }
+
+        // For multiple workflows, combine them into one script with separate functions
+        let base_url = options
+            .base_url
+            .clone()
+            .unwrap_or_else(|| Self::get_base_url(openapi));
+
+        let mut lines = Vec::new();
+
+        // Add header comment
+        lines.push("// k6 script generated from Arazzo specification".to_string());
+        lines.push(format!("// Contains {} workflows", arazzo.workflows.len()));
+        lines.push(String::new());
+
+        // Add imports
+        lines.push("import http from 'k6/http';".to_string());
+        lines.push("import { check, sleep } from 'k6';".to_string());
+        lines.push(String::new());
+
+        // Add options
+        lines.push(Self::generate_options(options));
+
+        // Generate each workflow as a separate function
+        for workflow in &arazzo.workflows {
+            let func_name = workflow.workflow_id.replace('-', "_");
+            lines.push(format!("// Workflow: {}", workflow.workflow_id));
+            if let Some(ref summary) = workflow.summary {
+                lines.push(format!("// {}", summary));
+            }
+            lines.push(format!("function {}() {{", func_name));
+
+            // Add inputs
+            let inputs = Self::generate_inputs(workflow);
+            lines.push(inputs);
+
+            // Generate steps
+            for step in &workflow.steps {
+                let step_code = self.generate_step(step, openapi, &base_url)?;
+                lines.push(step_code);
+            }
+
+            lines.push("}".to_string());
+            lines.push(String::new());
+        }
+
+        // Add default function that calls all workflows
+        lines.push("export default function () {".to_string());
+        for workflow in &arazzo.workflows {
+            let func_name = workflow.workflow_id.replace('-', "_");
+            lines.push(format!("  {}();", func_name));
+        }
+        lines.push("  sleep(1);".to_string());
+        lines.push("}".to_string());
+
+        Ok(lines.join("\n"))
     }
 
     fn convert_workflow(
@@ -666,7 +714,7 @@ mod tests {
         let script = result.unwrap();
         assert!(script.contains("import http from 'k6/http'"));
         assert!(script.contains("export default function"));
-        assert!(script.contains("registerUser") == false); // Should use actual paths
+        assert!(!script.contains("registerUser")); // Should use actual paths
         assert!(script.contains("/register") || script.contains("/login"));
     }
 }

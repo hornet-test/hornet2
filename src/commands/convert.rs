@@ -13,12 +13,12 @@ use std::path::Path;
 pub fn execute_convert(
     arazzo_path: &Path,
     openapi_path: &Path,
-    output_path: &Option<std::path::PathBuf>,
+    output_path: Option<&Path>,
     target: &str,
-    workflow_id: &Option<String>,
-    base_url: &Option<String>,
+    workflow_id: Option<&str>,
+    base_url: Option<&str>,
     vus: Option<u32>,
-    duration: &Option<String>,
+    duration: Option<&str>,
     iterations: Option<u32>,
 ) -> Result<()> {
     // Load Arazzo file
@@ -39,9 +39,9 @@ pub fn execute_convert(
 
     // Build convert options
     let options = ConvertOptions {
-        base_url: base_url.clone(),
+        base_url: base_url.map(|s| s.to_string()),
         vus,
-        duration: duration.clone(),
+        duration: duration.map(|s| s.to_string()),
         iterations,
     };
 
@@ -50,12 +50,12 @@ pub fn execute_convert(
         "k6" => {
             let converter = K6Converter::new();
 
-            if let Some(ref wf_id) = workflow_id {
+            if let Some(wf_id) = workflow_id {
                 // Convert specific workflow
                 let workflow = arazzo
                     .workflows
                     .iter()
-                    .find(|w| &w.workflow_id == wf_id)
+                    .find(|w| w.workflow_id == wf_id)
                     .ok_or_else(|| {
                         crate::error::HornetError::ValidationError(format!(
                             "Workflow '{}' not found",
@@ -78,7 +78,7 @@ pub fn execute_convert(
     };
 
     // Output result
-    if let Some(ref path) = output_path {
+    if let Some(path) = output_path {
         fs::write(path, &script)?;
         println!(
             "{} Generated {} script: {}",
@@ -98,10 +98,10 @@ pub fn execute_run(
     arazzo_path: &Path,
     openapi_path: &Path,
     engine: &str,
-    workflow_id: &Option<String>,
-    base_url: &Option<String>,
+    workflow_id: Option<&str>,
+    base_url: Option<&str>,
     vus: Option<u32>,
-    duration: &Option<String>,
+    duration: Option<&str>,
     iterations: Option<u32>,
 ) -> Result<()> {
     use crate::runner::{K6Runner, Runner};
@@ -114,9 +114,9 @@ pub fn execute_run(
     let openapi = load_openapi(openapi_path)?;
 
     let options = ConvertOptions {
-        base_url: base_url.clone(),
+        base_url: base_url.map(|s| s.to_string()),
         vus,
-        duration: duration.clone(),
+        duration: duration.map(|s| s.to_string()),
         iterations,
     };
 
@@ -135,11 +135,11 @@ pub fn execute_run(
 
             println!("{} k6 version: {}", "✓".green(), runner.version()?);
 
-            let script = if let Some(ref wf_id) = workflow_id {
+            let script = if let Some(wf_id) = workflow_id {
                 let workflow = arazzo
                     .workflows
                     .iter()
-                    .find(|w| &w.workflow_id == wf_id)
+                    .find(|w| w.workflow_id == wf_id)
                     .ok_or_else(|| {
                         crate::error::HornetError::ValidationError(format!(
                             "Workflow '{}' not found",
