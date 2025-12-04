@@ -156,6 +156,90 @@ impl<'a> FlowGraphExporter<'a> {
             ),
         }
     }
+
+    /// Export to Mermaid format
+    pub fn export_mermaid(&self) -> String {
+        let mut mermaid = String::new();
+
+        // Header
+        mermaid.push_str("flowchart LR\n");
+
+        // Nodes
+        for node_idx in self.graph.graph.node_indices() {
+            if let Some(node) = self.graph.graph.node_weight(node_idx) {
+                let label = self.format_mermaid_node_label(node);
+                let shape = self.get_mermaid_node_shape(node);
+
+                mermaid.push_str(&format!(
+                    "  {}{}{}]\n",
+                    node.step_id.replace('-', "_"),
+                    shape.0,
+                    label
+                ));
+            }
+        }
+
+        mermaid.push('\n');
+
+        // Edges
+        for edge in self.graph.graph.edge_references() {
+            let source = &self.graph.graph[edge.source()].step_id.replace('-', "_");
+            let target = &self.graph.graph[edge.target()].step_id.replace('-', "_");
+            let edge_data = edge.weight();
+
+            let arrow = match edge_data.edge_type {
+                EdgeType::Sequential => "-->",
+                EdgeType::Conditional => "-.->",
+                EdgeType::DataDependency => "==>",
+            };
+
+            if let Some(label) = self.get_mermaid_edge_label(edge_data) {
+                mermaid.push_str(&format!(
+                    "  {} {}|{}| {}\n",
+                    source, arrow, label, target
+                ));
+            } else {
+                mermaid.push_str(&format!("  {} {} {}\n", source, arrow, target));
+            }
+        }
+
+        mermaid
+    }
+
+    /// Format node label for Mermaid
+    fn format_mermaid_node_label(&self, node: &super::FlowNode) -> String {
+        let mut label = node.step_id.clone();
+
+        if let Some(ref op_id) = node.operation_id {
+            label.push_str(&format!("<br/>{}", op_id));
+        }
+
+        if let Some(ref method) = node.method {
+            label.push_str(&format!("<br/>[{}]", method));
+        }
+
+        label
+    }
+
+    /// Get Mermaid node shape
+    fn get_mermaid_node_shape(&self, node: &super::FlowNode) -> (&'static str, &'static str) {
+        if node.has_success_criteria {
+            ("(", ")")  // Rectangular with rounded corners
+        } else if node.has_outputs {
+            ("([", "])")  // Stadium shape
+        } else {
+            ("[", "]")  // Regular rectangle
+        }
+    }
+
+    /// Get edge label for Mermaid
+    fn get_mermaid_edge_label(&self, edge: &super::FlowEdge) -> Option<String> {
+        match edge.edge_type {
+            EdgeType::Sequential => None,
+            EdgeType::Conditional => edge.description.clone(),
+            EdgeType::DataDependency => edge.data_ref.clone(),
+        }
+    }
 }
 
 /// Export flow graph to DOT format
@@ -166,6 +250,11 @@ pub fn export_dot(graph: &FlowGraph) -> String {
 /// Export flow graph to JSON format
 pub fn export_json(graph: &FlowGraph) -> Result<Value> {
     FlowGraphExporter::new(graph).export_json()
+}
+
+/// Export flow graph to Mermaid format
+pub fn export_mermaid(graph: &FlowGraph) -> String {
+    FlowGraphExporter::new(graph).export_mermaid()
 }
 
 #[cfg(test)]
