@@ -3,9 +3,9 @@ use crate::{
     loader, Result,
 };
 use colored::*;
-use std::path::PathBuf;
+use std::path::Path;
 
-pub fn execute_validate(openapi_path: &PathBuf, arazzo_path: &PathBuf) -> Result<()> {
+pub fn execute_validate(openapi_path: &Path, arazzo_path: &Path) -> Result<()> {
     let mut has_errors = false;
 
     // Validate OpenAPI
