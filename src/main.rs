@@ -30,6 +30,35 @@ async fn main() -> Result<()> {
         } => {
             commands::execute_serve(&arazzo, &openapi, port).await?;
         }
+        Commands::Convert {
+            arazzo,
+            openapi,
+            to,
+            output,
+            workflow,
+            base_url,
+            vus,
+            duration,
+            iterations,
+        } => {
+            commands::execute_convert(
+                &arazzo, &openapi, &output, &to, &workflow, &base_url, vus, &duration, iterations,
+            )?;
+        }
+        Commands::Run {
+            arazzo,
+            openapi,
+            engine,
+            workflow,
+            base_url,
+            vus,
+            duration,
+            iterations,
+        } => {
+            commands::execute_run(
+                &arazzo, &openapi, &engine, &workflow, &base_url, vus, &duration, iterations,
+            )?;
+        }
     }
 
     Ok(())

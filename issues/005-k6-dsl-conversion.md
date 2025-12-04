@@ -2,8 +2,9 @@
 
 **Phase**: 2 (テスト実行)
 **Priority**: Medium
-**Status**: Todo
+**Status**: Done
 **Depends on**: #001, #002
+**Completed**: 2024-12-04
 
 ## 概要
 
