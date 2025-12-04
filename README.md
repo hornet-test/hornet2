@@ -78,7 +78,7 @@ cargo build --release
 
 ### 使い方
 
-#### 1. OpenAPI/Arazzo の検証
+#### 1. ワークフロー一覧の表示
 
 ```bash
 # Makefile を使う場合
@@ -86,9 +86,18 @@ make validate
 
 # または直接 cargo で実行
 cargo run -- validate --openapi tests/fixtures/openapi.yaml --arazzo tests/fixtures/arazzo.yaml
+# Arazzo ファイル内のワークフローを一覧表示
+cargo run -- list --arazzo tests/fixtures/arazzo.yaml
 ```
 
-#### 2. フロー図の生成 (CLI)
+#### 2. OpenAPI/Arazzo の検証
+
+```bash
+# OpenAPI と Arazzo 仕様の検証
+cargo run -- validate --openapi tests/fixtures/openapi.yaml --arazzo tests/fixtures/arazzo.yaml
+```
+
+#### 3. フロー図の生成 (CLI)
 
 ```bash
 # Makefile を使う場合
@@ -97,10 +106,14 @@ make visualize ARGS="--format json"
 
 # または直接 cargo で実行
 cargo run -- visualize --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --format dot
+# DOT 形式で出力
+cargo run -- visualize --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --format dot
+
+# JSON 形式で出力
 cargo run -- visualize --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --format json
 ```
 
-#### 3. Web UI での可視化 ✨
+#### 4. Web UI での可視化 ✨
 
 **開発モード（推奨）**:
 ```bash
@@ -108,6 +121,8 @@ make dev
 # APIサーバー: http://localhost:3000
 # UI開発サーバー: http://localhost:5173 ← ブラウザでこちらを開く
 ```
+# Web サーバーを起動
+cargo run -- serve --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --port 3000
 
 **本番モード**:
 ```bash
@@ -282,7 +297,7 @@ make clean              # ビルド成果物をクリーンアップ
 - [x] OpenAPI / Arazzo YAML パーサー ✅
 - [x] フロー図の生成（グラフ構造への変換） ✅
 - [x] Web UI での可視化 ✅
-- [ ] CLI での基本操作
+- [x] CLI での基本操作 ✅
 
 ### Phase 2: テスト実行
 - [ ] 外部ツール（k6 など）への DSL 変換

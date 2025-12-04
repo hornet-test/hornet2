@@ -2,7 +2,7 @@
 
 **Phase**: 1 (MVP - 可視化)
 **Priority**: High
-**Status**: Todo
+**Status**: ✅ Completed (2024-12-03)
 **Depends on**: #001, #002
 
 ## 概要
@@ -144,13 +144,13 @@ pub enum HornetError {
 
 ## 成果物
 
-- [ ] `src/cli.rs`: CLI の引数定義
-- [ ] `src/commands/list.rs`: list コマンドの実装
-- [ ] `src/commands/validate.rs`: validate コマンドの実装
-- [ ] `src/commands/visualize.rs`: visualize コマンドの実装
-- [ ] `src/commands/serve.rs`: serve コマンドの実装
-- [ ] `src/error.rs`: エラー型の定義
-- [ ] ヘルプメッセージの充実
+- [x] `src/cli.rs`: CLI の引数定義
+- [x] `src/commands/list.rs`: list コマンドの実装
+- [x] `src/commands/validate.rs`: validate コマンドの実装
+- [x] `src/commands/visualize.rs`: visualize コマンドの実装
+- [x] `src/commands/serve.rs`: serve コマンドの実装
+- [x] `src/error.rs`: エラー型の定義
+- [x] ヘルプメッセージの充実
 
 ## テストケース
 
