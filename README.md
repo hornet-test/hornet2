@@ -1,5 +1,7 @@
 # hornet2 (仮称)
 
+[![CI](https://github.com/hornet-test/hornet2/actions/workflows/rust.yml/badge.svg)](https://github.com/hornet-test/hornet2/actions/workflows/rust.yml)
+
 **ドキュメント駆動型 API テストツール**
 
 [Arazzo Specification](https://spec.openapis.org/arazzo/) と OpenAPI を活用し、
