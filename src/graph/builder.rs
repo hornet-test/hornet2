@@ -169,7 +169,7 @@ pub fn build_flow_graph(workflow: &Workflow, openapi: Option<&OpenApiV3Spec>) ->
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::arazzo::{Info, Parameter, RequestBody};
+    use crate::models::arazzo::Parameter;
 
     #[test]
     fn test_simple_workflow() {
