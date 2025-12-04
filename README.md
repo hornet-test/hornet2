@@ -102,15 +102,25 @@ cargo run -- visualize --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtu
 
 #### 3. Web UI での可視化 ✨
 
+**開発モード（推奨）**:
 ```bash
-# Makefile で開発モード起動（推奨）
 make dev
-# → CLI: http://localhost:3000
-# → UI: http://localhost:5173
+# APIサーバー: http://localhost:3000
+# UI開発サーバー: http://localhost:5173 ← ブラウザでこちらを開く
+```
 
-# または CLI サーバーのみ起動
+**本番モード**:
+```bash
+# UIをビルドしてから起動
+make build
 make cli-dev
 # → http://localhost:3000
+```
+
+**その他の起動方法**:
+```bash
+# CLI サーバーのみ起動（本番ビルド版UIを配信）
+make cli-dev
 
 # または直接 cargo で実行
 cargo run -- serve --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --port 3000
@@ -198,15 +208,33 @@ pnpm test
 
 ### フルスタック開発
 
-UI と Rust サーバーを同時に開発する場合：
+UI と Rust サーバーを同時に開発する場合、**`make dev` を使うのが最も簡単です**：
 
 ```bash
-# ターミナル1: Rust サーバー起動
+make dev
+```
+
+これにより：
+- 🦀 **APIサーバー**が http://localhost:3000 で起動
+- ⚛️ **UI開発サーバー**が http://localhost:5173 で起動
+- 🔗 **自動プロキシ**: UI開発サーバーから `/api/*` へのリクエストがAPIサーバー（3000）に自動転送される
+- 🔄 **ホットリロード**: UIコードの変更が即座に反映される
+
+**ブラウザで http://localhost:5173 を開く**と、Viteの開発サーバーでホストされたページからAPIサーバーを参照できます。
+
+#### 手動での起動（2つのターミナル）
+
+または、個別に起動することもできます：
+
+```bash
+# ターミナル1: Rust APIサーバー起動
 cargo run -- serve --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml
 
 # ターミナル2: UI 開発サーバー起動
 cd ui && pnpm dev
 ```
+
+**注意**: Viteの開発サーバー（5173）は [vite.config.js](ui/vite.config.js) でプロキシ設定されており、`/api/*` へのリクエストを自動的にポート3000に転送します。
 
 ### Makefile を使った開発
 
