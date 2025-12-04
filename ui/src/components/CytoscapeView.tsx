@@ -1,5 +1,7 @@
-import React, { useEffect, useRef } from 'react';
-import { createCytoscape } from '../lib/cytoscape.js';
+import { useEffect, useRef } from 'react';
+import type { Core, ElementDefinition, EventObject, LayoutOptions, NodeSingular } from 'cytoscape';
+import { createCytoscape } from '../lib/cytoscape';
+import type { GraphData, LayoutOption, SelectedNode } from '../types/graph';
 
 const styles = [
   {
@@ -85,9 +87,10 @@ const styles = [
   },
 ];
 
-function applyLayout(cy, layoutName) {
+function applyLayout(cy: Core | null, layoutName: LayoutOption['value']) {
   if (!cy) return;
-  let options = {
+
+  let options: LayoutOptions = {
     name: layoutName,
     animate: true,
     animationDuration: 500,
@@ -109,12 +112,19 @@ function applyLayout(cy, layoutName) {
   }
 
   cy.layout(options).run();
-  setTimeout(() => cy.fit(null, 50), 600);
+  setTimeout(() => cy.fit(undefined, 50), 600);
 }
 
-export function CytoscapeView({ graph, layout, onNodeSelected, onCanvasCleared }) {
-  const containerRef = useRef(null);
-  const cyRef = useRef(null);
+type CytoscapeViewProps = {
+  graph: GraphData | null;
+  layout: LayoutOption['value'];
+  onNodeSelected: (data: SelectedNode) => void;
+  onCanvasCleared: () => void;
+};
+
+export function CytoscapeView({ graph, layout, onNodeSelected, onCanvasCleared }: CytoscapeViewProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const cyRef = useRef<Core | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return undefined;
@@ -128,12 +138,22 @@ export function CytoscapeView({ graph, layout, onNodeSelected, onCanvasCleared }
       wheelSensitivity: 0.2,
     });
 
-    cy.on('tap', 'node', (evt) => {
-      const node = evt.target;
-      onNodeSelected({ ...node.data(), connectedEdges: node.connectedEdges().length });
+    cy.on('tap', 'node', (evt: EventObject) => {
+      const node = evt.target as NodeSingular;
+      const nodeData = node.data() as unknown as SelectedNode;
+
+      onNodeSelected({
+        id: nodeData.id,
+        label: nodeData.label,
+        method: nodeData.method,
+        operation_id: nodeData.operation_id,
+        path: nodeData.path,
+        description: nodeData.description,
+        connectedEdges: node.connectedEdges().length,
+      });
     });
 
-    cy.on('tap', (evt) => {
+    cy.on('tap', (evt: EventObject) => {
       if (evt.target === cy) {
         onCanvasCleared();
       }
@@ -146,8 +166,7 @@ export function CytoscapeView({ graph, layout, onNodeSelected, onCanvasCleared }
 
   useEffect(() => {
     if (!cyRef.current || !graph) return;
-    const cy = cyRef.current;
-    const elements = [];
+    const elements: ElementDefinition[] = [];
 
     graph.nodes.forEach((node) => {
       elements.push({
@@ -174,9 +193,9 @@ export function CytoscapeView({ graph, layout, onNodeSelected, onCanvasCleared }
       });
     });
 
-    cy.elements().remove();
-    cy.add(elements);
-    applyLayout(cy, layout);
+    cyRef.current.elements().remove();
+    cyRef.current.add(elements);
+    applyLayout(cyRef.current, layout);
   }, [graph, layout]);
 
   useEffect(() => {

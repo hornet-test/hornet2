@@ -1,6 +1,10 @@
-import React from 'react';
+import type { SelectedNode } from '../types/graph';
 
-export function DetailsPanel({ nodeData }) {
+type DetailsPanelProps = {
+  nodeData: SelectedNode | null;
+};
+
+export function DetailsPanel({ nodeData }: DetailsPanelProps) {
   const connectionCount = nodeData?.connectedEdges ?? 0;
 
   return (

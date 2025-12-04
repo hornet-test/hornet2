@@ -6,7 +6,6 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // Proxy API requests to the Rust server
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,
