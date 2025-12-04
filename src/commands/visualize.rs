@@ -8,10 +8,11 @@ use crate::{
     loader, Result,
 };
 use colored::*;
+use std::path::Path;
 use std::path::PathBuf;
 
 pub fn execute_visualize(
-    arazzo_path: &PathBuf,
+    arazzo_path: &Path,
     openapi_path: &Option<PathBuf>,
     format: &OutputFormat,
     output_path: &Option<PathBuf>,

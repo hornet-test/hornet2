@@ -1,8 +1,8 @@
 use crate::{loader, Result};
 use colored::*;
-use std::path::PathBuf;
+use std::path::Path;
 
-pub fn execute_list(arazzo_path: &PathBuf) -> Result<()> {
+pub fn execute_list(arazzo_path: &Path) -> Result<()> {
     println!("{}", "Loading Arazzo file...".bright_blue());
     println!("  Path: {}", arazzo_path.display());
 

@@ -1,53 +1,12 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hornet2 - API Flow Visualization</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
-    <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
-    <script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
-</head>
-<body>
-    <div class="container">
-        <header>
-            <h1>Hornet2 - API Flow Visualization</h1>
-            <p class="subtitle">Document-driven API testing tool</p>
-        </header>
-
-        <div class="controls">
-            <div class="control-group">
-                <label for="workflow-select">Select Workflow:</label>
-                <select id="workflow-select">
-                    <option value="">Loading...</option>
-                </select>
-            </div>
-            <div class="control-group">
-                <label for="layout-select">Layout:</label>
-                <select id="layout-select">
-                    <option value="dagre" selected>Hierarchical (Dagre)</option>
-                    <option value="breadthfirst">Breadth First</option>
-                    <option value="circle">Circle</option>
-                    <option value="grid">Grid</option>
-                </select>
-            </div>
-            <button id="refresh-btn" class="btn">Refresh</button>
-        </div>
-
-        <div class="main-content">
-            <div id="cy"></div>
-            <div id="details-panel" class="details-panel">
-                <h3>Node Details</h3>
-                <div id="details-content">
-                    <p class="placeholder">Click on a node to see details</p>
-                </div>
-            </div>
-        </div>
-
-        <div id="status" class="status"></div>
-    </div>
-
-    <script src="/static/app.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hornet2</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
 </html>
