@@ -224,7 +224,7 @@ impl<'a> FlowGraphExporter<'a> {
     /// Get Mermaid node shape
     fn get_mermaid_node_shape(&self, node: &super::FlowNode) -> (&'static str, &'static str) {
         if node.has_success_criteria {
-            ("[", "]")  // Rectangular with rounded corners
+            ("(", ")")  // Rectangular with rounded corners
         } else if node.has_outputs {
             ("([", "])")  // Stadium shape
         } else {
