@@ -13,9 +13,8 @@ pub fn load_arazzo<P: AsRef<Path>>(path: P) -> Result<ArazzoSpec> {
     })?;
 
     // Parse YAML
-    let spec: ArazzoSpec = serde_yaml::from_str(&content).map_err(|e| {
-        HornetError::ArazzoLoadError(format!("Failed to parse Arazzo YAML: {}", e))
-    })?;
+    let spec: ArazzoSpec = serde_yaml::from_str(&content)
+        .map_err(|e| HornetError::ArazzoLoadError(format!("Failed to parse Arazzo YAML: {}", e)))?;
 
     // Validate
     spec.validate()?;

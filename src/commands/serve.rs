@@ -19,7 +19,9 @@ pub async fn execute_serve(
 
     let addr = format!("127.0.0.1:{}", port).parse().unwrap();
     let arazzo_str = arazzo_path.to_str().unwrap().to_string();
-    let openapi_str = openapi_path.as_ref().map(|p| p.to_str().unwrap().to_string());
+    let openapi_str = openapi_path
+        .as_ref()
+        .map(|p| p.to_str().unwrap().to_string());
 
     server::start_server(addr, arazzo_str, openapi_str).await?;
 

@@ -19,7 +19,10 @@ pub fn execute_list(arazzo_path: &PathBuf) -> Result<()> {
         return Ok(());
     }
 
-    println!("{}", format!("Workflows ({}):", arazzo.workflows.len()).bold());
+    println!(
+        "{}",
+        format!("Workflows ({}):", arazzo.workflows.len()).bold()
+    );
     for (idx, workflow) in arazzo.workflows.iter().enumerate() {
         println!();
         println!(
@@ -49,7 +52,10 @@ pub fn execute_list(arazzo_path: &PathBuf) -> Result<()> {
             if let Some(ref operation_id) = step.operation_id {
                 println!("          Operation: {}", operation_id.bright_yellow());
             } else if let Some(ref operation_path) = step.operation_path {
-                println!("          Operation Path: {}", operation_path.bright_yellow());
+                println!(
+                    "          Operation Path: {}",
+                    operation_path.bright_yellow()
+                );
             } else if let Some(ref workflow_id) = step.workflow_id {
                 println!("          Workflow: {}", workflow_id.bright_magenta());
             }

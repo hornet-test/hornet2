@@ -27,13 +27,14 @@ pub fn load_openapi<P: AsRef<Path>>(path: P) -> Result<OpenApiV3Spec> {
 fn validate_openapi(spec: &OpenApiV3Spec) -> Result<()> {
     // Check version
     if !spec.openapi.starts_with("3.0") && !spec.openapi.starts_with("3.1") {
-        return Err(HornetError::ValidationError(
-            format!("Unsupported OpenAPI version: {}. Only 3.0.x and 3.1.x are supported.", spec.openapi),
-        ));
+        return Err(HornetError::ValidationError(format!(
+            "Unsupported OpenAPI version: {}. Only 3.0.x and 3.1.x are supported.",
+            spec.openapi
+        )));
     }
 
     // Check that there are paths defined
-    if spec.paths.as_ref().map_or(true, |p| p.is_empty()) {
+    if spec.paths.as_ref().is_none_or(|p| p.is_empty()) {
         return Err(HornetError::ValidationError(
             "OpenAPI spec must have at least one path".to_string(),
         ));

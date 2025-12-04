@@ -58,7 +58,7 @@ impl<'a> FlowGraphBuilder<'a> {
         // Note: We don't add separate edges for data dependencies since
         // the sequential edges already represent the execution order.
         // We just annotate the existing edges with data dependency information.
-        for (_i, step) in self.workflow.steps.iter().enumerate() {
+        for step in self.workflow.steps.iter() {
             let dependencies = self.extract_data_dependencies(step);
 
             if !dependencies.is_empty() {
@@ -71,10 +71,7 @@ impl<'a> FlowGraphBuilder<'a> {
         for (i, step) in self.workflow.steps.iter().enumerate() {
             if let Some(ref criteria) = step.success_criteria {
                 if !criteria.is_empty() {
-                    let description = format!(
-                        "Success criteria: {} conditions",
-                        criteria.len()
-                    );
+                    let description = format!("Success criteria: {} conditions", criteria.len());
                     // Add self-loop to indicate conditional execution
                     graph.add_edge(
                         node_indices[i],
@@ -161,10 +158,7 @@ impl<'a> FlowGraphBuilder<'a> {
 }
 
 /// Build a flow graph from a workflow
-pub fn build_flow_graph(
-    workflow: &Workflow,
-    openapi: Option<&OpenApiV3Spec>,
-) -> Result<FlowGraph> {
+pub fn build_flow_graph(workflow: &Workflow, openapi: Option<&OpenApiV3Spec>) -> Result<FlowGraph> {
     let mut builder = FlowGraphBuilder::new(workflow);
     if let Some(spec) = openapi {
         builder = builder.with_openapi(spec);

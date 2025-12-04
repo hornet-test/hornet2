@@ -75,7 +75,11 @@ pub struct Workflow {
     pub steps: Vec<Step>,
 
     /// Success criteria for the workflow
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "successCriteria")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "successCriteria"
+    )]
     pub success_criteria: Option<Vec<SuccessCriteria>>,
 
     /// Output values from the workflow
@@ -98,15 +102,27 @@ pub struct Step {
     pub description: Option<String>,
 
     /// Reference to an operation by operationId
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "operationId")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "operationId"
+    )]
     pub operation_id: Option<String>,
 
     /// Reference to an operation by path and method
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "operationPath")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "operationPath"
+    )]
     pub operation_path: Option<String>,
 
     /// Reference to a workflow to execute
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "workflowId")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "workflowId"
+    )]
     pub workflow_id: Option<String>,
 
     /// Parameters for the operation
@@ -114,11 +130,19 @@ pub struct Step {
     pub parameters: Vec<Parameter>,
 
     /// Request body for the operation
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "requestBody")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "requestBody"
+    )]
     pub request_body: Option<RequestBody>,
 
     /// Success criteria for the step
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "successCriteria")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "successCriteria"
+    )]
     pub success_criteria: Option<Vec<SuccessCriteria>>,
 
     /// Actions to take on success
@@ -150,7 +174,11 @@ pub struct Parameter {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RequestBody {
     /// The content type of the request body
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "contentType")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "contentType"
+    )]
     pub content_type: Option<String>,
 
     /// The payload (can be a runtime expression)
@@ -209,11 +237,19 @@ pub struct Components {
     pub parameters: Option<HashMap<String, Parameter>>,
 
     /// Reusable success criteria
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "successActions")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "successActions"
+    )]
     pub success_actions: Option<HashMap<String, SuccessAction>>,
 
     /// Reusable failure actions
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "failureActions")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "failureActions"
+    )]
     pub failure_actions: Option<HashMap<String, FailureAction>>,
 
     /// Additional components
@@ -226,18 +262,20 @@ impl ArazzoSpec {
     pub fn validate(&self) -> Result<(), crate::error::HornetError> {
         // Check version
         if !self.arazzo.starts_with("1.") {
-            return Err(crate::error::HornetError::ValidationError(
-                format!("Unsupported Arazzo version: {}", self.arazzo),
-            ));
+            return Err(crate::error::HornetError::ValidationError(format!(
+                "Unsupported Arazzo version: {}",
+                self.arazzo
+            )));
         }
 
         // Check that all workflows have unique IDs
         let mut workflow_ids = std::collections::HashSet::new();
         for workflow in &self.workflows {
             if !workflow_ids.insert(&workflow.workflow_id) {
-                return Err(crate::error::HornetError::ValidationError(
-                    format!("Duplicate workflow ID: {}", workflow.workflow_id),
-                ));
+                return Err(crate::error::HornetError::ValidationError(format!(
+                    "Duplicate workflow ID: {}",
+                    workflow.workflow_id
+                )));
             }
         }
 
@@ -257,9 +295,10 @@ impl Workflow {
         let mut step_ids = std::collections::HashSet::new();
         for step in &self.steps {
             if !step_ids.insert(&step.step_id) {
-                return Err(crate::error::HornetError::ValidationError(
-                    format!("Duplicate step ID: {} in workflow {}", step.step_id, self.workflow_id),
-                ));
+                return Err(crate::error::HornetError::ValidationError(format!(
+                    "Duplicate step ID: {} in workflow {}",
+                    step.step_id, self.workflow_id
+                )));
             }
         }
 
@@ -276,10 +315,14 @@ impl Step {
     /// Validate the step
     pub fn validate(&self) -> Result<(), crate::error::HornetError> {
         // Check that at least one of operationId, operationPath, or workflowId is set
-        if self.operation_id.is_none() && self.operation_path.is_none() && self.workflow_id.is_none() {
-            return Err(crate::error::HornetError::ValidationError(
-                format!("Step {} must have either operationId, operationPath, or workflowId", self.step_id),
-            ));
+        if self.operation_id.is_none()
+            && self.operation_path.is_none()
+            && self.workflow_id.is_none()
+        {
+            return Err(crate::error::HornetError::ValidationError(format!(
+                "Step {} must have either operationId, operationPath, or workflowId",
+                self.step_id
+            )));
         }
 
         Ok(())

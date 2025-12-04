@@ -91,7 +91,9 @@ pub fn execute_visualize(
         std::fs::write(path, &output)?;
         println!(
             "{}",
-            format!("✓ Output written to: {}", path.display()).green().bold()
+            format!("✓ Output written to: {}", path.display())
+                .green()
+                .bold()
         );
     } else {
         println!("{}", "# Output:".bright_cyan());

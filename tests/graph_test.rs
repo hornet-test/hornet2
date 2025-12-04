@@ -1,5 +1,9 @@
 use hornet2::{
-    graph::{builder::build_flow_graph, exporter::{export_dot, export_json}, validator::validate_flow_graph},
+    graph::{
+        builder::build_flow_graph,
+        exporter::{export_dot, export_json},
+        validator::validate_flow_graph,
+    },
     loader::{load_arazzo, load_openapi},
 };
 use std::path::Path;
@@ -133,7 +137,10 @@ fn test_export_json() {
     assert_eq!(nodes[1]["id"], "login");
     assert_eq!(nodes[1]["method"], "POST");
 
-    println!("JSON output:\n{}", serde_json::to_string_pretty(&json).unwrap());
+    println!(
+        "JSON output:\n{}",
+        serde_json::to_string_pretty(&json).unwrap()
+    );
 }
 
 #[test]

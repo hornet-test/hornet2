@@ -1,5 +1,5 @@
-pub mod openapi;
 pub mod arazzo;
+pub mod openapi;
 
-pub use openapi::load_openapi;
 pub use arazzo::load_arazzo;
+pub use openapi::load_openapi;

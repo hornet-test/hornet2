@@ -25,7 +25,9 @@ impl<'a> FlowGraphValidator<'a> {
         // Check for cycles (excluding self-loops for conditional edges)
         if self.has_cycles()? {
             result.is_valid = false;
-            result.errors.push("Graph contains cycles (not a DAG)".to_string());
+            result
+                .errors
+                .push("Graph contains cycles (not a DAG)".to_string());
         }
 
         // Check for unreachable nodes
@@ -51,13 +53,14 @@ impl<'a> FlowGraphValidator<'a> {
         // Try topological sort
         match self.topological_order() {
             Ok(order) => {
-                result.warnings.push(format!(
-                    "Topological order: {}",
-                    order.join(" → ")
-                ));
+                result
+                    .warnings
+                    .push(format!("Topological order: {}", order.join(" → ")));
             }
             Err(e) => {
-                result.errors.push(format!("Failed to compute topological order: {}", e));
+                result
+                    .errors
+                    .push(format!("Failed to compute topological order: {}", e));
                 result.is_valid = false;
             }
         }
@@ -163,9 +166,7 @@ impl<'a> FlowGraphValidator<'a> {
             Ok(order) => {
                 let step_ids: Vec<String> = order
                     .into_iter()
-                    .filter_map(|idx| {
-                        graph_copy.node_weight(idx).map(|node| node.step_id.clone())
-                    })
+                    .filter_map(|idx| graph_copy.node_weight(idx).map(|node| node.step_id.clone()))
                     .collect();
                 Ok(step_ids)
             }

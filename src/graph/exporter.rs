@@ -149,11 +149,9 @@ impl<'a> FlowGraphExporter<'a> {
                 "orange",
                 edge.description.clone().unwrap_or_default(),
             ),
-            EdgeType::DataDependency => (
-                "dotted",
-                "blue",
-                edge.data_ref.clone().unwrap_or_default(),
-            ),
+            EdgeType::DataDependency => {
+                ("dotted", "blue", edge.data_ref.clone().unwrap_or_default())
+            }
         }
     }
 
@@ -194,10 +192,7 @@ impl<'a> FlowGraphExporter<'a> {
             };
 
             if let Some(label) = self.get_mermaid_edge_label(edge_data) {
-                mermaid.push_str(&format!(
-                    "  {} {}|{}| {}\n",
-                    source, arrow, label, target
-                ));
+                mermaid.push_str(&format!("  {} {}|{}| {}\n", source, arrow, label, target));
             } else {
                 mermaid.push_str(&format!("  {} {} {}\n", source, arrow, target));
             }
@@ -224,11 +219,11 @@ impl<'a> FlowGraphExporter<'a> {
     /// Get Mermaid node shape
     fn get_mermaid_node_shape(&self, node: &super::FlowNode) -> (&'static str, &'static str) {
         if node.has_success_criteria {
-            ("(", ")")  // Rectangular with rounded corners
+            ("(", ")") // Rectangular with rounded corners
         } else if node.has_outputs {
-            ("([", "])")  // Stadium shape
+            ("([", "])") // Stadium shape
         } else {
-            ("[", "]")  // Regular rectangle
+            ("[", "]") // Regular rectangle
         }
     }
 

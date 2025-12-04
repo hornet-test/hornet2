@@ -36,8 +36,12 @@ pub async fn get_workflows(
     State(state): State<AppState>,
 ) -> Result<Json<WorkflowsResponse>, (StatusCode, String)> {
     // Load Arazzo file
-    let arazzo = loader::load_arazzo(&state.arazzo_path)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to load Arazzo: {}", e)))?;
+    let arazzo = loader::load_arazzo(&state.arazzo_path).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to load Arazzo: {}", e),
+        )
+    })?;
 
     let workflows: Vec<WorkflowInfo> = arazzo
         .workflows
@@ -59,15 +63,21 @@ pub async fn get_graph(
     Path(workflow_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     // Load Arazzo file
-    let arazzo = loader::load_arazzo(&state.arazzo_path)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to load Arazzo: {}", e)))?;
+    let arazzo = loader::load_arazzo(&state.arazzo_path).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to load Arazzo: {}", e),
+        )
+    })?;
 
     // Load OpenAPI file if provided
     let openapi = if let Some(ref path) = state.openapi_path {
-        Some(
-            loader::load_openapi(path)
-                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to load OpenAPI: {}", e)))?,
-        )
+        Some(loader::load_openapi(path).map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to load OpenAPI: {}", e),
+            )
+        })?)
     } else {
         None
     };
@@ -85,12 +95,20 @@ pub async fn get_graph(
         })?;
 
     // Build graph
-    let graph = build_flow_graph(workflow, openapi.as_ref())
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to build graph: {}", e)))?;
+    let graph = build_flow_graph(workflow, openapi.as_ref()).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to build graph: {}", e),
+        )
+    })?;
 
     // Export to JSON
-    let json = export_json(&graph)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to export graph: {}", e)))?;
+    let json = export_json(&graph).map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to export graph: {}", e),
+        )
+    })?;
 
     Ok(Json(json))
 }

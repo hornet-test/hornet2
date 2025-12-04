@@ -63,35 +63,33 @@ pub fn execute_validate(openapi_path: &PathBuf, arazzo_path: &PathBuf) -> Result
             println!("  Workflow: {}", workflow.workflow_id.cyan());
 
             match build_flow_graph(workflow, openapi.as_ref()) {
-                Ok(graph) => {
-                    match validate_flow_graph(&graph) {
-                        Ok(validation) => {
-                            if validation.is_ok() {
-                                println!("    {}", "✓ Graph is valid".green());
-                            } else {
-                                if !validation.warnings.is_empty() {
-                                    println!("    {}", "⚠ Warnings:".yellow());
-                                    for warning in &validation.warnings {
-                                        println!("      - {}", warning.yellow());
-                                    }
-                                }
-
-                                if !validation.errors.is_empty() {
-                                    println!("    {}", "✗ Errors:".red().bold());
-                                    for error in &validation.errors {
-                                        println!("      - {}", error.red());
-                                    }
-                                    has_errors = true;
+                Ok(graph) => match validate_flow_graph(&graph) {
+                    Ok(validation) => {
+                        if validation.is_ok() {
+                            println!("    {}", "✓ Graph is valid".green());
+                        } else {
+                            if !validation.warnings.is_empty() {
+                                println!("    {}", "⚠ Warnings:".yellow());
+                                for warning in &validation.warnings {
+                                    println!("      - {}", warning.yellow());
                                 }
                             }
-                        }
-                        Err(e) => {
-                            println!("    {}", "✗ Validation failed".red().bold());
-                            println!("      {}", e.to_string().red());
-                            has_errors = true;
+
+                            if !validation.errors.is_empty() {
+                                println!("    {}", "✗ Errors:".red().bold());
+                                for error in &validation.errors {
+                                    println!("      - {}", error.red());
+                                }
+                                has_errors = true;
+                            }
                         }
                     }
-                }
+                    Err(e) => {
+                        println!("    {}", "✗ Validation failed".red().bold());
+                        println!("      {}", e.to_string().red());
+                        has_errors = true;
+                    }
+                },
                 Err(e) => {
                     println!("    {}", "✗ Failed to build graph".red().bold());
                     println!("      {}", e.to_string().red());
