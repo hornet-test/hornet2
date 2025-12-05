@@ -113,7 +113,7 @@ cargo run -- visualize --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtu
 cargo run -- visualize --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --format json
 ```
 
-#### 4. Web UI での可視化 ✨
+#### 4. Web UI での可視化とエディタ ✨
 
 **開発モード（推奨）**:
 ```bash
@@ -121,7 +121,12 @@ make dev
 # APIサーバー: http://localhost:3000
 # UI開発サーバー: http://localhost:5173 ← ブラウザでこちらを開く
 ```
-# Web サーバーを起動
+
+**2つのタブが利用可能**:
+- **Visualization**: ワークフローのグラフ可視化（既存機能）
+- **Editor**: Arazzo ワークフローの作成・編集（新機能！）
+
+# または、CLIサーバーのみ起動
 cargo run -- serve --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --port 3000
 
 **本番モード**:
@@ -142,11 +147,22 @@ cargo run -- serve --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/
 ```
 
 **Web UI 機能**:
+
+*Visualization タブ*:
 - インタラクティブなグラフ可視化（Cytoscape.js）
 - ノードのクリックで詳細表示
 - 複数レイアウト対応（階層型、円形、グリッドなど）
 - HTTPメソッドによる色分け
 - ズーム・パン操作
+
+*Editor タブ（新機能）*:
+- OpenAPI Operation一覧の表示とフィルタリング
+- ビジュアルワークフロービュー
+- YAML エディタ（Monaco Editor）
+- リアルタイムバリデーション
+- Visual ↔ YAML の双方向同期
+
+詳細は [EDITOR_GUIDE.md](EDITOR_GUIDE.md) を参照してください。
 
 ## 🛠️ 開発環境のセットアップ
 
@@ -293,11 +309,16 @@ make clean              # ビルド成果物をクリーンアップ
 
 ## 🔧 ロードマップ
 
-### Phase 1: 可視化 (MVP)
+### Phase 1: 可視化 + エディタ (MVP)
 - [x] OpenAPI / Arazzo YAML パーサー ✅
 - [x] フロー図の生成（グラフ構造への変換） ✅
 - [x] Web UI での可視化 ✅
 - [x] CLI での基本操作 ✅
+- [x] Web エディタ（Phase 1 MVP） ✅
+  - [x] Operation リスト表示・検索・フィルタ
+  - [x] ビジュアルワークフロービュー
+  - [x] YAML エディタと双方向同期
+  - [x] リアルタイムバリデーション
 
 ### Phase 2: テスト実行
 - [ ] 外部ツール（k6 など）への DSL 変換

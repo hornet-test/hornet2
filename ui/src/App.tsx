@@ -1,140 +1,134 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Controls } from './components/Controls';
-import { CytoscapeView } from './components/CytoscapeView';
-import { DetailsPanel } from './components/DetailsPanel';
-import { StatusBar } from './components/StatusBar';
-import type {
-  GraphData,
-  LayoutOption,
-  SelectedNode,
-  StatusMessage,
-  WorkflowSummary,
-} from './types/graph';
+import React, { useState } from 'react';
+import { VisualizationPage } from './pages/VisualizationPage';
+import { EditorPage } from './pages/EditorPage';
 
-const layoutOptions: LayoutOption[] = [
-  { value: 'dagre', label: 'Hierarchical (Dagre)' },
-  { value: 'breadthfirst', label: 'Breadth First' },
-  { value: 'circle', label: 'Circle' },
-  { value: 'grid', label: 'Grid' },
-];
+type PageType = 'visualization' | 'editor';
 
 export default function App() {
-  const [workflows, setWorkflows] = useState<WorkflowSummary[]>([]);
-  const [selectedWorkflow, setSelectedWorkflow] = useState<string>('');
-  const [layout, setLayout] = useState<LayoutOption['value']>('dagre');
-  const [status, setStatus] = useState<StatusMessage>({
-    message: 'Loading workflows...',
-    type: 'info',
-  });
-  const [graph, setGraph] = useState<GraphData | null>(null);
-  const [selectedNode, setSelectedNode] = useState<SelectedNode | null>(null);
-
-  const selectedWorkflowLabel = useMemo(
-    () => workflows.find((wf) => wf.workflow_id === selectedWorkflow)?.workflow_id ?? '',
-    [selectedWorkflow, workflows],
-  );
-
-  const fetchWorkflows = useCallback(async () => {
-    try {
-      setStatus({ message: 'Loading workflows...', type: 'info' });
-      const response = await fetch('/api/workflows');
-      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      const data = (await response.json()) as { workflows?: WorkflowSummary[] };
-      const newWorkflows = data.workflows ?? [];
-      setWorkflows(newWorkflows);
-
-      if (newWorkflows.length) {
-        setSelectedWorkflow(newWorkflows[0].workflow_id);
-      } else {
-        setSelectedWorkflow('');
-        setGraph(null);
-        setStatus({ message: 'No workflows found. Please load an Arazzo file.', type: 'error' });
-        return;
-      }
-
-      setStatus({ message: `Loaded ${newWorkflows.length} workflow(s)`, type: 'success' });
-    } catch (error) {
-      setStatus({ message: `Error: ${(error as Error).message}`, type: 'error' });
-    }
-  }, []);
-
-  const fetchGraph = useCallback(async (workflowId: string) => {
-    if (!workflowId) return;
-    try {
-      setStatus({ message: `Loading graph for ${workflowId}...`, type: 'info' });
-      const response = await fetch(`/api/graph/${encodeURIComponent(workflowId)}`);
-      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      const data = (await response.json()) as GraphData;
-      setGraph(data);
-      setStatus({
-        message: `Rendered ${data.nodes.length} nodes and ${data.edges.length} edges`,
-        type: 'success',
-      });
-    } catch (error) {
-      setStatus({ message: `Error: ${(error as Error).message}`, type: 'error' });
-    }
-  }, []);
-
-  useEffect(() => {
-    void fetchWorkflows();
-  }, [fetchWorkflows]);
-
-  useEffect(() => {
-    if (selectedWorkflow) {
-      void fetchGraph(selectedWorkflow);
-    }
-  }, [fetchGraph, selectedWorkflow]);
-
-  const handleWorkflowChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedWorkflow(event.target.value);
-    setSelectedNode(null);
-  };
-
-  const handleLayoutChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    setLayout(event.target.value as LayoutOption['value']);
-  };
-
-  const handleRefresh = () => {
-    setSelectedNode(null);
-    void fetchWorkflows();
-  };
-
-  const handleNodeSelected = useCallback((data: SelectedNode) => {
-    setSelectedNode(data);
-  }, []);
-
-  const handleCanvasCleared = useCallback(() => {
-    setSelectedNode(null);
-  }, []);
+  const [currentPage, setCurrentPage] = useState<PageType>('visualization');
 
   return (
-    <div className="container">
-      <header>
-        <h1>Hornet2 - API Flow Visualization</h1>
-        <p className="subtitle">Document-driven API testing tool</p>
+    <div className="app">
+      <header className="app-header">
+        <div className="header-content">
+          <div className="header-title">
+            <h1>Hornet2</h1>
+            <p className="subtitle">Document-driven API testing tool</p>
+          </div>
+          <nav className="nav-tabs">
+            <button
+              className={`nav-tab ${currentPage === 'visualization' ? 'active' : ''}`}
+              onClick={() => setCurrentPage('visualization')}
+            >
+              Visualization
+            </button>
+            <button
+              className={`nav-tab ${currentPage === 'editor' ? 'active' : ''}`}
+              onClick={() => setCurrentPage('editor')}
+            >
+              Editor
+            </button>
+          </nav>
+        </div>
       </header>
 
-      <Controls
-        workflows={workflows}
-        selectedWorkflow={selectedWorkflowLabel}
-        layout={layout}
-        onWorkflowChange={handleWorkflowChange}
-        onLayoutChange={handleLayoutChange}
-        onRefresh={handleRefresh}
-        layoutOptions={layoutOptions}
-      />
+      <main className="app-main">
+        {currentPage === 'visualization' && <VisualizationPage />}
+        {currentPage === 'editor' && <EditorPage />}
+      </main>
 
-      <div className="main-content">
-        <CytoscapeView
-          graph={graph}
-          layout={layout}
-          onNodeSelected={handleNodeSelected}
-          onCanvasCleared={handleCanvasCleared}
-        />
-        <DetailsPanel nodeData={selectedNode} />
-      </div>
+      <style>{`
+        * {
+          box-sizing: border-box;
+        }
 
-      <StatusBar message={status.message} type={status.type} />
+        html,
+        body,
+        #root,
+        .app {
+          margin: 0;
+          padding: 0;
+          height: 100%;
+          width: 100%;
+          overflow: hidden;
+        }
+
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+            'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+            sans-serif;
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+        }
+
+        code {
+          font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+        }
+
+        .app {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .app-header {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+          flex-shrink: 0;
+        }
+
+        .header-content {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 1rem 2rem;
+          max-width: 100%;
+        }
+
+        .header-title h1 {
+          margin: 0;
+          font-size: 1.75rem;
+          font-weight: 700;
+        }
+
+        .header-title .subtitle {
+          margin: 0.25rem 0 0 0;
+          font-size: 0.9rem;
+          opacity: 0.9;
+        }
+
+        .nav-tabs {
+          display: flex;
+          gap: 0.5rem;
+        }
+
+        .nav-tab {
+          padding: 0.75rem 1.5rem;
+          background: rgba(255, 255, 255, 0.1);
+          color: white;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 6px;
+          font-size: 0.95rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .nav-tab:hover {
+          background: rgba(255, 255, 255, 0.2);
+        }
+
+        .nav-tab.active {
+          background: white;
+          color: #667eea;
+          border-color: white;
+        }
+
+        .app-main {
+          flex: 1;
+          overflow: hidden;
+        }
+      `}</style>
     </div>
   );
 }
