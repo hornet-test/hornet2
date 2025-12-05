@@ -1,4 +1,4 @@
-.PHONY: help install build dev test clean ui-dev cli-dev ui-build ui-test cli-build cli-test stop-dev
+.PHONY: help install build dev test clean ui-dev cli-dev ui-build ui-test cli-build cli-test stop-dev ui-lint ui-format lint
 
 # デフォルトターゲット
 .DEFAULT_GOAL := help
@@ -38,6 +38,19 @@ ui-build: ## UIをビルド
 	@echo "$(BLUE)Building UI...$(NC)"
 	@cd ui && pnpm build
 	@echo "$(GREEN)✓ UI built: ui/dist/$(NC)"
+
+ui-lint: ## UIのLintを実行
+	@echo "$(BLUE)Running UI lint...$(NC)"
+	@cd ui && pnpm lint
+	@echo "$(GREEN)✓ UI lint passed$(NC)"
+
+ui-format: ## UIのコードを整形
+	@echo "$(BLUE)Formatting UI code...$(NC)"
+	@cd ui && pnpm format
+	@echo "$(GREEN)✓ UI formatted$(NC)"
+
+lint: ui-lint ## すべてのLintを実行
+	@echo "$(GREEN)✓ All lint checks passed$(NC)"
 
 dev: ## 開発モード: CLIサーバーとUIを同時起動（Ctrl+Cで両方停止）
 	@echo "$(BLUE)Starting development servers...$(NC)"
@@ -82,11 +95,14 @@ check: ## コードのチェック（フォーマット・lint）
 	@echo "$(BLUE)Checking Rust code...$(NC)"
 	@cargo fmt --check
 	@cargo clippy -- -D warnings
+	@echo "$(BLUE)Checking UI code...$(NC)"
+	@cd ui && pnpm lint
 	@echo "$(GREEN)✓ Code check passed$(NC)"
 
 fmt: ## コードをフォーマット
 	@echo "$(BLUE)Formatting code...$(NC)"
 	@cargo fmt
+	@cd ui && pnpm format
 	@echo "$(GREEN)✓ Code formatted$(NC)"
 
 run: ## CLIを実行（引数: ARGS="..."）
