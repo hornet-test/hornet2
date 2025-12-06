@@ -1,5 +1,12 @@
 import { useEffect, useRef } from 'react';
-import type { Core, ElementDefinition, EventObject, LayoutOptions, NodeSingular } from 'cytoscape';
+import type {
+  Core,
+  CytoscapeOptions,
+  ElementDefinition,
+  EventObject,
+  LayoutOptions,
+  NodeSingular,
+} from 'cytoscape';
 import { createCytoscape } from '../lib/cytoscape';
 import type { GraphData, LayoutOption, SelectedNode } from '../types/graph';
 
@@ -85,31 +92,28 @@ const styles = [
       'background-color': '#764ba2',
     },
   },
-];
+] as CytoscapeOptions['style'];
 
 function applyLayout(cy: Core | null, layoutName: LayoutOption['value']) {
   if (!cy) return;
 
-  let options: LayoutOptions = {
-    name: layoutName,
-    animate: true,
-    animationDuration: 500,
-  };
-
-  if (layoutName === 'dagre') {
-    options = {
-      ...options,
-      rankDir: 'TB',
-      nodeSep: 50,
-      rankSep: 100,
-    };
-  } else if (layoutName === 'breadthfirst') {
-    options = {
-      ...options,
-      directed: true,
-      spacingFactor: 1.5,
-    };
-  }
+  const options: LayoutOptions =
+    layoutName === 'dagre'
+      ? // dagre pluginの型がcytoscapeの定義に含まれていないためキャストで対応
+        ({
+          name: layoutName,
+          animate: true,
+          animationDuration: 500,
+          rankDir: 'TB',
+          nodeSep: 50,
+          rankSep: 100,
+        } as unknown as LayoutOptions)
+      : ({
+          name: layoutName,
+          animate: true,
+          animationDuration: 500,
+          ...(layoutName === 'breadthfirst' ? { directed: true, spacingFactor: 1.5 } : {}),
+        } as LayoutOptions);
 
   cy.layout(options).run();
   setTimeout(() => cy.fit(undefined, 50), 600);
@@ -137,7 +141,13 @@ export function CytoscapeView({
       container: containerRef.current,
       style: styles,
       elements: [],
-      layout: { name: 'dagre', rankDir: 'TB', nodeSep: 50, rankSep: 100 },
+      // dagreプラグインの型はデフォルト定義にないためキャストで許容
+      layout: {
+        name: 'dagre',
+        rankDir: 'TB',
+        nodeSep: 50,
+        rankSep: 100,
+      } as unknown as LayoutOptions,
       minZoom: 0.3,
       maxZoom: 3,
       wheelSensitivity: 0.2,

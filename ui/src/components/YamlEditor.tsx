@@ -7,7 +7,7 @@ export const YamlEditor: React.FC = () => {
   const { yamlContent, setYamlContent, syncYamlToSpec, validationErrors, isValid } =
     useEditorStore();
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleEditorDidMount: OnMount = (editor) => {
     editorRef.current = editor;
@@ -20,7 +20,6 @@ export const YamlEditor: React.FC = () => {
 
     // Debounce validation
     if (timeoutRef.current) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       clearTimeout(timeoutRef.current);
     }
     timeoutRef.current = setTimeout(() => {

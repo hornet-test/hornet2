@@ -14,6 +14,5 @@
     "skipLibCheck": true,
     "types": ["vite/client", "vitest"]
   },
-  "include": ["src", "index.html", "vite.config.ts", "vitest.config.ts", "vitest.setup.ts"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "include": ["src", "index.html", "vite.config.ts", "vitest.config.ts", "vitest.setup.ts"]
 }
