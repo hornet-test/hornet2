@@ -2,7 +2,7 @@
 
 **Phase**: 1 (MVP - 可視化)
 **Priority**: Medium
-**Status**: Todo
+**Status**: ✅ Completed (2024-12-03)
 **Depends on**: #002
 
 ## 概要

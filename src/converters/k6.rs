@@ -279,10 +279,7 @@ impl K6Converter {
         };
 
         // Generate request body
-        let body_code = step
-            .request_body
-            .as_ref()
-            .map(Self::generate_request_body);
+        let body_code = step.request_body.as_ref().map(Self::generate_request_body);
 
         // Add Content-Type if request body exists
         if step.request_body.is_some() {
@@ -504,7 +501,9 @@ impl K6Converter {
 
     /// Generate workflow inputs
     fn generate_inputs(workflow: &Workflow) -> String {
-        if let Some(serde_json::Value::Object(props_map)) = workflow.inputs.as_ref().and_then(|i| i.get("properties")) {
+        if let Some(serde_json::Value::Object(props_map)) =
+            workflow.inputs.as_ref().and_then(|i| i.get("properties"))
+        {
             let mut input_lines = Vec::new();
             for (name, schema) in props_map {
                 let default_val = schema.get("default");

@@ -67,38 +67,78 @@
 ```bash
 git clone <repository-url>
 cd hornet2
+
+# mise を使う場合（推奨）
+mise install
+make install
+
+# または cargo のみ
 cargo build --release
 ```
 
 ### 使い方
 
-#### 1. OpenAPI/Arazzo の検証
+#### 1. ワークフロー一覧の表示
 
 ```bash
-# OpenAPI 仕様の検証
-cargo run -- validate-openapi tests/fixtures/openapi.yaml
+# Makefile を使う場合
+make validate
 
-# Arazzo 仕様の検証
-cargo run -- validate-arazzo tests/fixtures/arazzo.yaml
+# または直接 cargo で実行
+cargo run -- validate --openapi tests/fixtures/openapi.yaml --arazzo tests/fixtures/arazzo.yaml
+# Arazzo ファイル内のワークフローを一覧表示
+cargo run -- list --arazzo tests/fixtures/arazzo.yaml
 ```
 
-#### 2. フロー図の生成 (CLI)
+#### 2. OpenAPI/Arazzo の検証
 
 ```bash
+# OpenAPI と Arazzo 仕様の検証
+cargo run -- validate --openapi tests/fixtures/openapi.yaml --arazzo tests/fixtures/arazzo.yaml
+```
+
+#### 3. フロー図の生成 (CLI)
+
+```bash
+# Makefile を使う場合
+make visualize ARGS="--format dot"
+make visualize ARGS="--format json"
+
+# または直接 cargo で実行
+cargo run -- visualize --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --format dot
 # DOT 形式で出力
-cargo run -- visualize tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --format dot
+cargo run -- visualize --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --format dot
 
 # JSON 形式で出力
-cargo run -- visualize tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --format json
+cargo run -- visualize --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --format json
 ```
 
-#### 3. Web UI での可視化 ✨
+#### 4. Web UI での可視化 ✨
 
+**開発モード（推奨）**:
 ```bash
+make dev
+# APIサーバー: http://localhost:3000
+# UI開発サーバー: http://localhost:5173 ← ブラウザでこちらを開く
+```
 # Web サーバーを起動
-cargo run -- serve tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --port 3000
+cargo run -- serve --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --port 3000
 
-# ブラウザで http://localhost:3000 を開く
+**本番モード**:
+```bash
+# UIをビルドしてから起動
+make build
+make cli-dev
+# → http://localhost:3000
+```
+
+**その他の起動方法**:
+```bash
+# CLI サーバーのみ起動（本番ビルド版UIを配信）
+make cli-dev
+
+# または直接 cargo で実行
+cargo run -- serve --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --port 3000
 ```
 
 **Web UI 機能**:
@@ -149,13 +189,156 @@ Metrics Summary:
   Checks: 8 passed, 0 failed
 ```
 
+## 🛠️ 開発環境のセットアップ
+
+### 必要なツール
+
+このプロジェクトでは [mise](https://mise.jdx.dev/) を使用してツールバージョンを管理しています。
+
+- Rust (stable)
+- Node.js 22
+- pnpm 10
+
+### セットアップ手順
+
+#### 1. mise のインストール
+
+```bash
+# macOS/Linux
+curl https://mise.run | sh
+
+# または Homebrew
+brew install mise
+```
+
+#### 2. 必要なツールのインストール
+
+```bash
+# プロジェクトルートで実行
+mise install
+```
+
+これにより、[mise.toml](mise.toml) で定義された Rust、Node.js、pnpm が自動的にインストールされます。
+
+#### 3. Rust プロジェクトのビルド
+
+```bash
+cargo build
+```
+
+#### 4. UI 開発のセットアップ
+
+```bash
+cd ui
+pnpm install
+```
+
+### UI 開発
+
+React + Vite で構築された Web UI を開発する場合：
+
+```bash
+cd ui
+
+# 開発サーバーを起動 (http://localhost:5173)
+pnpm dev
+
+# プロダクションビルド
+pnpm build
+
+# テスト実行
+pnpm test
+```
+
+**UI の技術スタック**:
+- React 18
+- Vite (ビルドツール)
+- Vitest (テスト)
+- Cytoscape.js (グラフ可視化)
+
+**開発時のワークフロー**:
+1. `pnpm dev` で開発サーバーを起動
+2. UI コードを編集（[ui/src/](ui/src/) 配下）
+3. ブラウザで自動リロード
+4. `pnpm test` でテスト実行
+
+### フルスタック開発
+
+UI と Rust サーバーを同時に開発する場合、**`make dev` を使うのが最も簡単です**：
+
+```bash
+make dev
+```
+
+これにより：
+- 🦀 **APIサーバー**が http://localhost:3000 で起動
+- ⚛️ **UI開発サーバー**が http://localhost:5173 で起動
+- 🔗 **自動プロキシ**: UI開発サーバーから `/api/*` へのリクエストがAPIサーバー（3000）に自動転送される
+- 🔄 **ホットリロード**: UIコードの変更が即座に反映される
+
+**ブラウザで http://localhost:5173 を開く**と、Viteの開発サーバーでホストされたページからAPIサーバーを参照できます。
+
+#### 手動での起動（2つのターミナル）
+
+または、個別に起動することもできます：
+
+```bash
+# ターミナル1: Rust APIサーバー起動
+cargo run -- serve --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml
+
+# ターミナル2: UI 開発サーバー起動
+cd ui && pnpm dev
+```
+
+**注意**: Viteの開発サーバー（5173）は [vite.config.js](ui/vite.config.js) でプロキシ設定されており、`/api/*` へのリクエストを自動的にポート3000に転送します。
+
+### Makefile を使った開発
+
+より便利な開発のために [Makefile](Makefile) を用意しています：
+
+```bash
+# ヘルプを表示
+make help
+
+# 依存関係をすべてインストール
+make install
+
+# 開発モード: CLIとUIを同時起動（Ctrl+Cで両方停止）
+make dev
+
+# ビルド
+make build              # CLIとUIを両方ビルド
+make cli-build          # CLIのみビルド
+make ui-build           # UIのみビルド
+
+# テスト
+make test               # すべてのテストを実行
+make cli-test           # Rustのテストのみ
+make ui-test            # UIのテストのみ
+make ui-test-watch      # UIテストをwatchモード
+
+# その他の便利なコマンド
+make visualize          # フロー図を生成
+make validate           # OpenAPI/Arazzoを検証
+make check              # コードチェック（fmt + clippy）
+make fmt                # コードフォーマット
+make clean              # ビルド成果物をクリーンアップ
+```
+
+**推奨ワークフロー**:
+1. `make install` で初回セットアップ
+2. `make dev` で開発サーバーを起動（CLI: http://localhost:3000、UI: http://localhost:5173）
+3. コードを編集して自動リロード
+4. `make test` でテストを実行
+5. `make build` で本番ビルド
+
 ## 🔧 ロードマップ
 
 ### Phase 1: 可視化 (MVP)
 - [x] OpenAPI / Arazzo YAML パーサー ✅
 - [x] フロー図の生成（グラフ構造への変換） ✅
 - [x] Web UI での可視化 ✅
-- [ ] CLI での基本操作
+- [x] CLI での基本操作 ✅
 
 ### Phase 2: テスト実行
 - [x] 外部ツール（k6）への DSL 変換 ✅
