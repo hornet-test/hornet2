@@ -2,10 +2,23 @@ import React, { useEffect, useState } from 'react';
 import { OperationList } from '../components/OperationList';
 import { WorkflowView } from '../components/WorkflowView';
 import { YamlEditor } from '../components/YamlEditor';
+import { DataSourcePanel } from '../components/DataSourcePanel';
 import { useEditorStore } from '../stores/editorStore';
 
 export const EditorPage: React.FC = () => {
-  const { loadOperations, isLoading, error } = useEditorStore();
+  const {
+    loadOperations,
+    isLoading,
+    error,
+    operations,
+    selectedStepId,
+    dataSourcePanelOpen,
+    toggleDataSourcePanel,
+    getAvailableDataSources,
+    addDataMapping,
+    removeDataMapping,
+    arazzoSpec,
+  } = useEditorStore();
   const [viewMode, setViewMode] = useState<'visual' | 'yaml' | 'split'>('split');
 
   useEffect(() => {
@@ -36,25 +49,57 @@ export const EditorPage: React.FC = () => {
     );
   }
 
+  // Get available data sources
+  const dataSources = getAvailableDataSources();
+
+  // Get target operation for selected step
+  const getTargetOperation = () => {
+    if (!selectedStepId || !arazzoSpec || arazzoSpec.workflows.length === 0) {
+      return null;
+    }
+    const workflow = arazzoSpec.workflows[0];
+    const step = workflow.steps.find((s) => s.stepId === selectedStepId);
+    if (!step || !step.operationId) {
+      return null;
+    }
+    return operations.find((op) => op.operation_id === step.operationId) || null;
+  };
+
+  const targetOperation = getTargetOperation();
+
   return (
     <div className="editor-page">
       <div className="editor-toolbar">
         <h2>Arazzo Workflow Editor</h2>
-        <div className="view-mode-toggle">
+        <div className="toolbar-controls">
+          <div className="view-mode-toggle">
+            <button
+              className={viewMode === 'visual' ? 'active' : ''}
+              onClick={() => setViewMode('visual')}
+            >
+              Visual
+            </button>
+            <button
+              className={viewMode === 'split' ? 'active' : ''}
+              onClick={() => setViewMode('split')}
+            >
+              Split
+            </button>
+            <button
+              className={viewMode === 'yaml' ? 'active' : ''}
+              onClick={() => setViewMode('yaml')}
+            >
+              YAML
+            </button>
+          </div>
           <button
-            className={viewMode === 'visual' ? 'active' : ''}
-            onClick={() => setViewMode('visual')}
+            className={`data-source-toggle ${dataSourcePanelOpen ? 'active' : ''}`}
+            onClick={toggleDataSourcePanel}
           >
-            Visual
-          </button>
-          <button
-            className={viewMode === 'split' ? 'active' : ''}
-            onClick={() => setViewMode('split')}
-          >
-            Split
-          </button>
-          <button className={viewMode === 'yaml' ? 'active' : ''} onClick={() => setViewMode('yaml')}>
-            YAML
+            🔗 Data Sources
+            {selectedStepId && dataSources.length > 0 && (
+              <span className="badge">{dataSources.length}</span>
+            )}
           </button>
         </div>
       </div>
@@ -86,6 +131,18 @@ export const EditorPage: React.FC = () => {
                 <YamlEditor />
               </div>
             </>
+          )}
+
+          {dataSourcePanelOpen && (
+            <div className="data-source-sidebar">
+              <DataSourcePanel
+                dataSources={dataSources}
+                selectedStepId={selectedStepId}
+                targetOperation={targetOperation}
+                onMapData={addDataMapping}
+                onRemoveMapping={removeDataMapping}
+              />
+            </div>
           )}
         </div>
       </div>
@@ -163,6 +220,12 @@ function getStyles() {
       color: #212529;
     }
 
+    .toolbar-controls {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+    }
+
     .view-mode-toggle {
       display: flex;
       gap: 0;
@@ -227,6 +290,53 @@ function getStyles() {
 
     .split-panel:last-child {
       border-right: none;
+    }
+
+    .data-source-sidebar {
+      width: 350px;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .data-source-toggle {
+      padding: 0.5rem 1rem;
+      background: #f8f9fa;
+      color: #495057;
+      border: 1px solid #dee2e6;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .data-source-toggle:hover {
+      background: #e9ecef;
+      border-color: #0d6efd;
+      color: #0d6efd;
+    }
+
+    .data-source-toggle.active {
+      background: #0d6efd;
+      color: white;
+      border-color: #0d6efd;
+    }
+
+    .data-source-toggle .badge {
+      background: #28a745;
+      color: white;
+      padding: 0.15rem 0.5rem;
+      border-radius: 10px;
+      font-size: 0.7rem;
+      font-weight: 700;
+    }
+
+    .data-source-toggle.active .badge {
+      background: white;
+      color: #0d6efd;
     }
   `;
 }

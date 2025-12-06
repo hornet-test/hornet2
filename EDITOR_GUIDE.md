@@ -45,6 +45,32 @@ The center panel shows your workflow steps visually.
 - View operation IDs, parameters, and success criteria
 - Empty state with helpful prompt when no steps exist
 
+### Data Flow Suggestions (Phase 2)
+
+The editor now includes intelligent data flow analysis that suggests parameter mappings between workflow steps.
+
+**Features**:
+- **Automatic Detection**: When you add operations to a workflow, the editor analyzes outputs from previous steps and suggests mappings to parameters in subsequent steps
+- **Confidence Scoring**: Suggestions are rated as high, medium, or low confidence based on:
+  - Name similarity (using Levenshtein distance)
+  - Authentication patterns (token, bearer, jwt, api-key)
+  - ID patterns (userId, postId, etc.)
+- **Suggestions Panel**: Shows on the right side when suggestions are available
+  - View source step → target parameter mappings
+  - Apply suggestions with one click
+  - Dismiss suggestions you don't want
+- **Smart Filtering**: Already-configured parameters are not suggested again
+
+**How to Use**:
+1. Add multiple operations to your workflow
+2. Look for the suggestions button in the toolbar (shows count)
+3. Review suggestions in the right panel
+4. Click "Apply" to automatically add the parameter mapping
+5. Click "Dismiss" to hide suggestions you don't need
+
+**Example**:
+If you add a `login` operation that outputs a `token`, followed by a `getProfile` operation that requires an `Authorization` header, the editor will suggest mapping `$steps.login.outputs.token` to the `Authorization` header with high confidence.
+
 ### YAML Editor
 
 The right panel provides a powerful code editor.
@@ -165,13 +191,25 @@ In the YAML editor:
 3. **Method Filters**: Filter by HTTP method to find related operations
 4. **Split View**: Use split view to see visual and YAML simultaneously
 5. **Validation**: Wait for the green checkmark before saving or exporting
+6. **Data Flow**: Add operations in logical order (e.g., login → get profile) to see smart parameter suggestions
 
-## Current Limitations
+## Current Features
 
-This is Phase 1 MVP. Future enhancements will include:
+**Phase 1 (Completed)**:
+- ✅ OpenAPI operation browsing with search and filters
+- ✅ Visual workflow builder
+- ✅ YAML live editor with syntax highlighting
+- ✅ Real-time validation with error reporting
+- ✅ Auto-selection of success criteria from OAS responses
 
+**Phase 2 (Completed)**:
+- ✅ Intelligent data flow analysis
+- ✅ Automatic parameter mapping suggestions
+- ✅ Confidence-based suggestion scoring
+- ✅ Pattern recognition (auth tokens, IDs)
+
+**Future Enhancements (Planned)**:
 - Drag-and-drop workflow building
-- Data flow suggestions between steps
 - OAS links detection and workflow suggestions
 - Template library
 - Export to k6/Postman

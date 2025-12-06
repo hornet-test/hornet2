@@ -135,6 +135,13 @@ pub struct OperationInfo {
     pub request_body: Option<RequestBodyInfo>,
     pub tags: Vec<String>,
     pub response_codes: Vec<String>, // HTTP response status codes (e.g. "200", "201", "404")
+    pub response_schema: Option<ResponseSchemaInfo>, // Response schema for 2xx responses
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ResponseSchemaInfo {
+    pub status_code: String,
+    pub properties: Vec<String>, // Top-level property names in response body
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -230,6 +237,48 @@ pub async fn get_operations(
                     Vec::new()
                 };
 
+                // Extract response schema from first 2xx response
+                let response_schema = if let Some(responses) = &op.responses {
+                    let mut success_response = None;
+
+                    // Find first 2xx response
+                    for (code, response) in responses.iter() {
+                        if code.starts_with('2') && code.chars().all(|c| c.is_ascii_digit()) {
+                            success_response = Some((code.clone(), response));
+                            break;
+                        }
+                    }
+
+                    success_response.and_then(|(code, response)| {
+                        match response {
+                            oas3::spec::ObjectOrReference::Object(resp) => {
+                                // Extract schema from first content type (usually application/json)
+                                resp.content.values().next().and_then(|media_type| {
+                                    match &media_type.schema {
+                                        Some(oas3::spec::ObjectOrReference::Object(schema)) => {
+                                            // Extract top-level property names
+                                            let properties: Vec<String> = schema.properties.keys().cloned().collect();
+
+                                            if !properties.is_empty() {
+                                                Some(ResponseSchemaInfo {
+                                                    status_code: code,
+                                                    properties,
+                                                })
+                                            } else {
+                                                None
+                                            }
+                                        }
+                                        _ => None,
+                                    }
+                                })
+                            }
+                            _ => None,
+                        }
+                    })
+                } else {
+                    None
+                };
+
                 OperationInfo {
                     operation_id,
                     method: method.to_uppercase(),
@@ -240,6 +289,7 @@ pub async fn get_operations(
                     request_body,
                     tags: op.tags.clone(),
                     response_codes,
+                    response_schema,
                 }
             };
 

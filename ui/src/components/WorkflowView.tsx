@@ -3,7 +3,7 @@ import { useEditorStore } from '../stores/editorStore';
 import type { ArazzoWorkflow, ArazzoStep } from '../types/editor';
 
 export const WorkflowView: React.FC = () => {
-  const { arazzoSpec } = useEditorStore();
+  const { arazzoSpec, selectedStepId, setSelectedStepId } = useEditorStore();
 
   if (!arazzoSpec || arazzoSpec.workflows.length === 0) {
     return (
@@ -25,8 +25,13 @@ export const WorkflowView: React.FC = () => {
       </div>
 
       <div className="workflows-container">
-        {arazzoSpec.workflows.map((workflow, index) => (
-          <WorkflowCard key={workflow.workflowId} workflow={workflow} index={index} />
+        {arazzoSpec.workflows.map((workflow) => (
+          <WorkflowCard
+            key={workflow.workflowId}
+            workflow={workflow}
+            selectedStepId={selectedStepId}
+            onSelectStep={setSelectedStepId}
+          />
         ))}
       </div>
 
@@ -37,10 +42,11 @@ export const WorkflowView: React.FC = () => {
 
 interface WorkflowCardProps {
   workflow: ArazzoWorkflow;
-  index: number;
+  selectedStepId: string | null;
+  onSelectStep: (stepId: string | null) => void;
 }
 
-const WorkflowCard: React.FC<WorkflowCardProps> = ({ workflow, index }) => {
+const WorkflowCard: React.FC<WorkflowCardProps> = ({ workflow, selectedStepId, onSelectStep }) => {
   return (
     <div className="workflow-card">
       <div className="workflow-card-header">
@@ -51,7 +57,13 @@ const WorkflowCard: React.FC<WorkflowCardProps> = ({ workflow, index }) => {
 
       <div className="steps-list">
         {workflow.steps.map((step, stepIndex) => (
-          <StepCard key={step.stepId} step={step} stepIndex={stepIndex} />
+          <StepCard
+            key={step.stepId}
+            step={step}
+            stepIndex={stepIndex}
+            isSelected={selectedStepId === step.stepId}
+            onSelect={() => onSelectStep(step.stepId)}
+          />
         ))}
       </div>
     </div>
@@ -61,13 +73,25 @@ const WorkflowCard: React.FC<WorkflowCardProps> = ({ workflow, index }) => {
 interface StepCardProps {
   step: ArazzoStep;
   stepIndex: number;
+  isSelected: boolean;
+  onSelect: () => void;
 }
 
-const StepCard: React.FC<StepCardProps> = ({ step, stepIndex }) => {
+const StepCard: React.FC<StepCardProps> = ({ step, stepIndex, isSelected, onSelect }) => {
   return (
     <div className="step-card">
       <div className="step-number">{stepIndex + 1}</div>
-      <div className="step-content">
+      <div
+        className={`step-content ${isSelected ? 'selected' : ''}`}
+        onClick={onSelect}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            onSelect();
+          }
+        }}
+      >
         <div className="step-header">
           <span className="step-id">{step.stepId}</span>
           {step.operationId && <span className="operation-id">{step.operationId}</span>}
@@ -227,6 +251,20 @@ function getStyles() {
       border: 1px solid #dee2e6;
       border-radius: 6px;
       padding: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .step-content:hover {
+      border-color: #0d6efd;
+      background: #e7f1ff;
+    }
+
+    .step-content.selected {
+      border-color: #0d6efd;
+      border-width: 2px;
+      background: #e7f1ff;
+      box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.1);
     }
 
     .step-header {

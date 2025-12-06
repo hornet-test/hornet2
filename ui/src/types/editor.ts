@@ -10,6 +10,12 @@ export interface OperationInfo {
   request_body?: RequestBodyInfo;
   tags: string[];
   response_codes: string[]; // HTTP status codes like "200", "201", "404"
+  response_schema?: ResponseSchemaInfo; // Response schema for 2xx responses
+}
+
+export interface ResponseSchemaInfo {
+  status_code: string;
+  properties: string[]; // Top-level property names in response body
 }
 
 export interface ParameterInfo {
