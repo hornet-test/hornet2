@@ -122,7 +122,12 @@ type CytoscapeViewProps = {
   onCanvasCleared: () => void;
 };
 
-export function CytoscapeView({ graph, layout, onNodeSelected, onCanvasCleared }: CytoscapeViewProps) {
+export function CytoscapeView({
+  graph,
+  layout,
+  onNodeSelected,
+  onCanvasCleared,
+}: CytoscapeViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const cyRef = useRef<Core | null>(null);
 

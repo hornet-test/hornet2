@@ -1,10 +1,7 @@
 import { create } from 'zustand';
 import yaml from 'js-yaml';
 import type { ArazzoSpec, OperationInfo, ValidationError } from '../types/editor';
-import {
-  analyzeDataFlow,
-  type DataFlowSuggestion,
-} from '../utils/dataFlowAnalyzer';
+import { analyzeDataFlow, type DataFlowSuggestion } from '../utils/dataFlowAnalyzer';
 
 export interface DataSource {
   sourceStepId: string;
@@ -50,7 +47,10 @@ interface EditorState {
   dismissSuggestion: (suggestion: DataFlowSuggestion) => void;
   getAvailableDataSources: () => DataSource[];
   addDataMapping: (dataSource: DataSource, targetParam: { name: string; location: string }) => void;
-  removeDataMapping: (dataSource: DataSource, targetParam: { name: string; location: string }) => void;
+  removeDataMapping: (
+    dataSource: DataSource,
+    targetParam: { name: string; location: string },
+  ) => void;
   reset: () => void;
 }
 
@@ -278,10 +278,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   // Add data mapping (output + parameter)
-  addDataMapping: (
-    dataSource: DataSource,
-    targetParam: { name: string; location: string },
-  ) => {
+  addDataMapping: (dataSource: DataSource, targetParam: { name: string; location: string }) => {
     const { arazzoSpec, selectedStepId } = get();
     if (!arazzoSpec || !selectedStepId) return;
 
@@ -335,10 +332,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   // Remove data mapping (parameter)
-  removeDataMapping: (
-    dataSource: DataSource,
-    targetParam: { name: string; location: string },
-  ) => {
+  removeDataMapping: (dataSource: DataSource, targetParam: { name: string; location: string }) => {
     const { arazzoSpec, selectedStepId } = get();
     if (!arazzoSpec || !selectedStepId) return;
 

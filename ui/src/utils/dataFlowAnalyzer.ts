@@ -30,9 +30,7 @@ export function analyzeDataFlow(
     if (!targetOperation) continue;
 
     // Get existing parameters in target step to avoid duplicate suggestions
-    const existingParams = new Set(
-      (targetStep.parameters || []).map((p) => `${p.name}:${p.in}`),
-    );
+    const existingParams = new Set((targetStep.parameters || []).map((p) => `${p.name}:${p.in}`));
 
     // Check each parameter in target operation
     for (const param of targetOperation.parameters) {

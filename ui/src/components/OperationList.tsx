@@ -82,7 +82,9 @@ export const OperationList: React.FC = () => {
             className={`method-filter ${methodFilter.includes(method) ? 'active' : ''}`}
             style={{
               borderColor: getMethodColor(method),
-              backgroundColor: methodFilter.includes(method) ? getMethodColor(method) : 'transparent',
+              backgroundColor: methodFilter.includes(method)
+                ? getMethodColor(method)
+                : 'transparent',
               color: methodFilter.includes(method) ? 'white' : getMethodColor(method),
             }}
             onClick={() => toggleMethodFilter(method)}

@@ -98,10 +98,7 @@ export const SuggestionPanel: React.FC<SuggestionPanelProps> = ({
             <div className="suggestion-reason">{suggestion.reason}</div>
 
             <div className="suggestion-actions">
-              <button
-                className="action-button apply"
-                onClick={() => onApplySuggestion(suggestion)}
-              >
+              <button className="action-button apply" onClick={() => onApplySuggestion(suggestion)}>
                 Apply
               </button>
               <button

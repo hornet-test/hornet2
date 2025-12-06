@@ -257,7 +257,8 @@ pub async fn get_operations(
                                     match &media_type.schema {
                                         Some(oas3::spec::ObjectOrReference::Object(schema)) => {
                                             // Extract top-level property names
-                                            let properties: Vec<String> = schema.properties.keys().cloned().collect();
+                                            let properties: Vec<String> =
+                                                schema.properties.keys().cloned().collect();
 
                                             if !properties.is_empty() {
                                                 Some(ResponseSchemaInfo {
@@ -349,8 +350,7 @@ pub async fn validate_arazzo(
     Json(payload): Json<ValidateRequest>,
 ) -> Result<Json<ValidateResponse>, (StatusCode, String)> {
     // Try to parse the YAML
-    let parse_result: Result<ArazzoSpec, serde_yaml::Error> =
-        serde_yaml::from_str(&payload.yaml);
+    let parse_result: Result<ArazzoSpec, serde_yaml::Error> = serde_yaml::from_str(&payload.yaml);
 
     match parse_result {
         Ok(spec) => {

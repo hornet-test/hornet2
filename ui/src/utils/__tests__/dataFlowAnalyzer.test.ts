@@ -30,7 +30,7 @@ describe('dataFlowAnalyzer', () => {
         method: 'GET',
         path: '/profile',
         summary: 'Get user profile',
-        description: 'Retrieve the authenticated user\'s profile',
+        description: "Retrieve the authenticated user's profile",
         parameters: [
           {
             name: 'Authorization',

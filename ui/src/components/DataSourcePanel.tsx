@@ -7,7 +7,10 @@ interface DataSourcePanelProps {
   selectedStepId: string | null;
   targetOperation: OperationInfo | null;
   onMapData: (dataSource: DataSource, targetParam: { name: string; location: string }) => void;
-  onRemoveMapping: (dataSource: DataSource, targetParam: { name: string; location: string }) => void;
+  onRemoveMapping: (
+    dataSource: DataSource,
+    targetParam: { name: string; location: string },
+  ) => void;
 }
 
 export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({
@@ -121,7 +124,9 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({
             <div key={sourceKey} className={`source-item ${isMapped ? 'mapped' : ''}`}>
               <div className="source-header">
                 <div className="source-info">
-                  <div className="source-step">{source.sourceStepId} &gt; {source.sourceStepDescription}</div>
+                  <div className="source-step">
+                    {source.sourceStepId} &gt; {source.sourceStepDescription}
+                  </div>
                   <div className="source-property">
                     <span className="property-name">{source.propertyName}</span>
                     {getStatusBadge(source)}

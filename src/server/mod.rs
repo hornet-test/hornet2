@@ -1,6 +1,10 @@
 pub mod api;
 
-use axum::{http::StatusCode, routing::{get, post}, Router};
+use axum::{
+    http::StatusCode,
+    routing::{get, post},
+    Router,
+};
 use std::net::SocketAddr;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber;
