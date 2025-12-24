@@ -202,159 +202,26 @@ impl K6Converter {
         let mut lines = Vec::new();
 
         // Add step comment
-        if let Some(ref desc) = step.description {
-            lines.push(format!("  // Step: {} - {}", step.step_id, desc));
-        } else {
-            lines.push(format!("  // Step: {}", step.step_id));
-        }
+        lines.push(self.generate_step_comment(step));
 
         // Get operation info
-        let (path, method) = if let Some(ref op_id) = step.operation_id {
-            Self::find_operation(openapi, op_id).ok_or_else(|| {
-                HornetError::OperationNotFound(format!("Operation '{}' not found", op_id))
-            })?
-        } else if let Some(ref op_path) = step.operation_path {
-            // Parse operationPath format: "method path" e.g., "POST /register"
-            let parts: Vec<&str> = op_path.splitn(2, ' ').collect();
-            if parts.len() == 2 {
-                (parts[1].to_string(), parts[0].to_uppercase())
-            } else {
-                return Err(HornetError::ValidationError(format!(
-                    "Invalid operationPath format: {}",
-                    op_path
-                )));
-            }
-        } else {
-            return Err(HornetError::ValidationError(format!(
-                "Step '{}' has no operationId or operationPath",
-                step.step_id
-            )));
-        };
+        let (path, method) = self.get_operation_info(step, openapi)?;
 
-        // Build URL with path parameters
-        let url = format!("{}{}", base_url, path);
+        // Build URL
+        let final_url = self.build_url(base_url, &path, &step.parameters);
 
-        // Collect headers and query params
-        let mut headers: HashMap<String, String> = HashMap::new();
-        let mut query_params: Vec<String> = Vec::new();
-        let mut path_params: HashMap<String, String> = HashMap::new();
-
-        for param in &step.parameters {
-            let value = Self::convert_value_with_expr(&param.value);
-            match param.location.as_str() {
-                "header" => {
-                    headers.insert(param.name.clone(), value);
-                }
-                "query" => {
-                    query_params.push(format!("{}=${{{}}}", param.name, value));
-                }
-                "path" => {
-                    path_params.insert(param.name.clone(), value);
-                }
-                _ => {}
-            }
-        }
-
-        // Build URL with query params
-        let final_url = if query_params.is_empty() {
-            format!("\"{}\"", url)
-        } else {
-            format!("`{}?{}`", url, query_params.join("&"))
-        };
-
-        // Apply path parameters
-        let final_url = if path_params.is_empty() {
-            final_url
-        } else {
-            let mut url_str = final_url;
-            for (name, value) in &path_params {
-                url_str = url_str.replace(&format!("{{{}}}", name), &format!("${{{}}}", value));
-            }
-            // Convert to template literal if needed
-            if url_str.starts_with('"') && url_str.contains("${") {
-                format!("`{}`", &url_str[1..url_str.len() - 1])
-            } else {
-                url_str
-            }
-        };
-
-        // Generate request body
-        let body_code = step.request_body.as_ref().map(Self::generate_request_body);
-
-        // Add Content-Type if request body exists
-        if step.request_body.is_some() {
-            let content_type = step
-                .request_body
-                .as_ref()
-                .and_then(|b| b.content_type.clone())
-                .unwrap_or_else(|| "application/json".to_string());
-            headers
-                .entry("Content-Type".to_string())
-                .or_insert_with(|| format!("\"{}\"", content_type));
-        }
-
-        // Generate headers object
-        let headers_code = if headers.is_empty() {
-            None
-        } else {
-            let header_lines: Vec<String> = headers
-                .iter()
-                .map(|(k, v)| format!("      '{}': {}", k, v))
-                .collect();
-            Some(format!(
-                "    headers: {{\n{}\n    }}",
-                header_lines.join(",\n")
-            ))
-        };
+        // Generate request body and headers
+        let (body_code, headers_code) = self.generate_body_and_headers(step);
 
         // Generate the HTTP call
         let response_var = format!("{}_response", step.step_id);
-        let http_call = match method.as_str() {
-            "GET" => {
-                if let Some(ref h) = headers_code {
-                    format!(
-                        "  let {} = http.get({}, {{\n{}\n  }});",
-                        response_var, final_url, h
-                    )
-                } else {
-                    format!("  let {} = http.get({});", response_var, final_url)
-                }
-            }
-            "DELETE" => {
-                if let Some(ref h) = headers_code {
-                    format!(
-                        "  let {} = http.del({}, null, {{\n{}\n  }});",
-                        response_var, final_url, h
-                    )
-                } else {
-                    format!("  let {} = http.del({});", response_var, final_url)
-                }
-            }
-            "POST" | "PUT" | "PATCH" => {
-                let method_fn = method.to_lowercase();
-                let body = body_code.as_deref().unwrap_or("null");
-                if let Some(ref h) = headers_code {
-                    format!(
-                        "  let {} = http.{}({}, {}, {{\n{}\n  }});",
-                        response_var, method_fn, final_url, body, h
-                    )
-                } else {
-                    format!(
-                        "  let {} = http.{}({}, {});",
-                        response_var, method_fn, final_url, body
-                    )
-                }
-            }
-            _ => {
-                format!(
-                    "  let {} = http.request('{}', {}, {});",
-                    response_var,
-                    method,
-                    final_url,
-                    body_code.as_deref().unwrap_or("null")
-                )
-            }
-        };
+        let http_call = self.generate_http_call(
+            &method,
+            &response_var,
+            &final_url,
+            body_code.as_deref(),
+            headers_code.as_deref(),
+        );
         lines.push(http_call);
 
         // Generate check assertions from successCriteria
@@ -383,6 +250,184 @@ impl K6Converter {
         lines.push(String::new()); // Empty line after step
 
         Ok(lines.join("\n"))
+    }
+
+    fn generate_step_comment(&self, step: &Step) -> String {
+        if let Some(ref desc) = step.description {
+            format!("  // Step: {} - {}", step.step_id, desc)
+        } else {
+            format!("  // Step: {}", step.step_id)
+        }
+    }
+
+    fn get_operation_info(&self, step: &Step, openapi: &OpenApiV3Spec) -> Result<(String, String)> {
+        if let Some(ref op_id) = step.operation_id {
+            Self::find_operation(openapi, op_id).ok_or_else(|| {
+                HornetError::OperationNotFound(format!("Operation '{}' not found", op_id))
+            })
+        } else if let Some(ref op_path) = step.operation_path {
+            let parts: Vec<&str> = op_path.splitn(2, ' ').collect();
+            if parts.len() == 2 {
+                Ok((parts[1].to_string(), parts[0].to_uppercase()))
+            } else {
+                Err(HornetError::ValidationError(format!(
+                    "Invalid operationPath format: {}",
+                    op_path
+                )))
+            }
+        } else {
+            Err(HornetError::ValidationError(format!(
+                "Step '{}' has no operationId or operationPath",
+                step.step_id
+            )))
+        }
+    }
+
+    fn build_url(
+        &self,
+        base_url: &str,
+        path: &str,
+        parameters: &[crate::models::arazzo::Parameter],
+    ) -> String {
+        let url = format!("{}{}", base_url, path);
+        let mut query_params: Vec<String> = Vec::new();
+        let mut path_params: HashMap<String, String> = HashMap::new();
+
+        for param in parameters {
+            let value = Self::convert_value_with_expr(&param.value);
+            match param.location.as_str() {
+                "query" => {
+                    query_params.push(format!("{}=${{{}}}", param.name, value));
+                }
+                "path" => {
+                    path_params.insert(param.name.clone(), value);
+                }
+                _ => {}
+            }
+        }
+
+        let mut final_url = if query_params.is_empty() {
+            format!("\"{}\"", url)
+        } else {
+            format!("`{}?{}`", url, query_params.join("&"))
+        };
+
+        if !path_params.is_empty() {
+            for (name, value) in &path_params {
+                final_url = final_url.replace(&format!("{{{}}}", name), &format!("${{{}}}", value));
+            }
+            if final_url.starts_with('"') && final_url.contains("${") {
+                final_url = format!("`{}`", &final_url[1..final_url.len() - 1]);
+            }
+        }
+
+        final_url
+    }
+
+    fn generate_body_and_headers(&self, step: &Step) -> (Option<String>, Option<String>) {
+        let mut headers: HashMap<String, String> = HashMap::new();
+
+        // Process header parameters
+        for param in &step.parameters {
+            if param.location == "header" {
+                headers.insert(
+                    param.name.clone(),
+                    Self::convert_value_with_expr(&param.value),
+                );
+            }
+        }
+
+        let body_code = step.request_body.as_ref().map(Self::generate_request_body);
+
+        if step.request_body.is_some() {
+            let content_type = step
+                .request_body
+                .as_ref()
+                .and_then(|b| b.content_type.clone())
+                .unwrap_or_else(|| "application/json".to_string());
+            headers
+                .entry("Content-Type".to_string())
+                .or_insert_with(|| format!("\"{}\"", content_type));
+        }
+
+        let headers_code = if headers.is_empty() {
+            None
+        } else {
+            let header_lines: Vec<String> = headers
+                .iter()
+                .map(|(k, v)| format!("      '{}': {}", k, v))
+                .collect();
+            Some(format!(
+                "    headers: {{\n{}\n    }}",
+                header_lines.join(",\n")
+            ))
+        };
+
+        (body_code, headers_code)
+    }
+
+    fn generate_http_call(
+        &self,
+        method: &str,
+        response_var: &str,
+        url: &str,
+        body: Option<&str>,
+        headers: Option<&str>,
+    ) -> String {
+        match method {
+            "GET" => {
+                if let Some(h) = headers {
+                    format!(
+                        "  let {} = http.get({}, {{\n{}\n  }});",
+                        response_var, url, h
+                    )
+                } else {
+                    format!("  let {} = http.get({});", response_var, url)
+                }
+            }
+            "DELETE" => {
+                // Fixed: Support body in DELETE requests
+                let body_arg = body.unwrap_or("null");
+                if let Some(h) = headers {
+                    format!(
+                        "  let {} = http.del({}, {}, {{\n{}\n  }});",
+                        response_var, url, body_arg, h
+                    )
+                } else {
+                    format!("  let {} = http.del({}, {});", response_var, url, body_arg)
+                }
+            }
+            "POST" | "PUT" | "PATCH" => {
+                let method_fn = method.to_lowercase();
+                let body_arg = body.unwrap_or("null");
+                if let Some(h) = headers {
+                    format!(
+                        "  let {} = http.{}({}, {}, {{\n{}\n  }});",
+                        response_var, method_fn, url, body_arg, h
+                    )
+                } else {
+                    format!(
+                        "  let {} = http.{}({}, {});",
+                        response_var, method_fn, url, body_arg
+                    )
+                }
+            }
+            _ => {
+                // Fixed: Support headers (params) in generic requests
+                let body_arg = body.unwrap_or("null");
+                if let Some(h) = headers {
+                    format!(
+                        "  let {} = http.request('{}', {}, {}, {{\n{}\n  }});",
+                        response_var, method, url, body_arg, h
+                    )
+                } else {
+                    format!(
+                        "  let {} = http.request('{}', {}, {});",
+                        response_var, method, url, body_arg
+                    )
+                }
+            }
+        }
     }
 
     /// Generate request body code
@@ -697,6 +742,35 @@ mod tests {
         let code = K6Converter::generate_options(&options);
         assert!(code.contains("vus: 10"));
         assert!(code.contains("duration: '30s'"));
+    }
+
+    #[test]
+    fn test_generate_http_call_delete_with_body() {
+        let converter = K6Converter::new();
+        let code = converter.generate_http_call(
+            "DELETE",
+            "resp",
+            "http://example.com",
+            Some("JSON.stringify({id: 1})"),
+            Some("headers: {'Content-Type': 'application/json'}"),
+        );
+        assert!(code.contains("http.del(http://example.com, JSON.stringify({id: 1}), {"));
+        assert!(code.contains("headers: {'Content-Type': 'application/json'}"));
+    }
+
+    #[test]
+    fn test_generate_http_call_generic_with_headers() {
+        let converter = K6Converter::new();
+        // Test OPTIONS with headers
+        let code = converter.generate_http_call(
+            "OPTIONS",
+            "resp",
+            "http://example.com",
+            None,
+            Some("headers: {'X-Custom': 'value'}"),
+        );
+        assert!(code.contains("http.request('OPTIONS', http://example.com, null, {"));
+        assert!(code.contains("headers: {'X-Custom': 'value'}"));
     }
 
     #[test]
