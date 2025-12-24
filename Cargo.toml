@@ -32,6 +32,7 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 mime_guess = "2.0"
 
-[dev-dependencies]
-# Testing
+# Utility
 tempfile = "3.0"
+
+[dev-dependencies]
