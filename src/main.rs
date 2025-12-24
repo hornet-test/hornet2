@@ -41,17 +41,17 @@ async fn main() -> Result<()> {
             duration,
             iterations,
         } => {
-            commands::execute_convert(
-                &arazzo,
-                &openapi,
-                output.as_deref(),
-                &to,
-                workflow.as_deref(),
-                base_url.as_deref(),
+            commands::execute_convert(commands::ConvertCommandArgs {
+                arazzo_path: &arazzo,
+                openapi_path: &openapi,
+                output_path: output.as_deref(),
+                target: &to,
+                workflow_id: workflow.as_deref(),
+                base_url: base_url.as_deref(),
                 vus,
-                duration.as_deref(),
+                duration: duration.as_deref(),
                 iterations,
-            )?;
+            })?;
         }
         Commands::Run {
             arazzo,
@@ -63,16 +63,16 @@ async fn main() -> Result<()> {
             duration,
             iterations,
         } => {
-            commands::execute_run(
-                &arazzo,
-                &openapi,
-                &engine,
-                workflow.as_deref(),
-                base_url.as_deref(),
+            commands::execute_run(commands::RunCommandArgs {
+                arazzo_path: &arazzo,
+                openapi_path: &openapi,
+                engine: &engine,
+                workflow_id: workflow.as_deref(),
+                base_url: base_url.as_deref(),
                 vus,
-                duration.as_deref(),
+                duration: duration.as_deref(),
                 iterations,
-            )?;
+            })?;
         }
     }
 

@@ -4,7 +4,7 @@ pub mod serve;
 pub mod validate;
 pub mod visualize;
 
-pub use convert::{execute_convert, execute_run};
+pub use convert::{execute_convert, execute_run, ConvertCommandArgs, RunCommandArgs};
 pub use list::execute_list;
 pub use serve::execute_serve;
 pub use validate::execute_validate;

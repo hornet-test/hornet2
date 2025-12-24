@@ -1,6 +1,6 @@
-//! Convert command implementation
+//! 変換コマンドの実装
 //!
-//! Converts Arazzo workflows to various test script formats.
+//! Arazzoワークフローを各種テストスクリプト形式へ変換する。
 
 use crate::converters::{ConvertOptions, Converter, K6Converter};
 use crate::error::Result;
@@ -9,19 +9,46 @@ use colored::Colorize;
 use std::fs;
 use std::path::Path;
 
-/// Execute the convert command
-pub fn execute_convert(
-    arazzo_path: &Path,
-    openapi_path: &Path,
-    output_path: Option<&Path>,
-    target: &str,
-    workflow_id: Option<&str>,
-    base_url: Option<&str>,
-    vus: Option<u32>,
-    duration: Option<&str>,
-    iterations: Option<u32>,
-) -> Result<()> {
-    // Load Arazzo file
+/// `execute_convert` に渡す引数をまとめた構造体
+pub struct ConvertCommandArgs<'a> {
+    pub arazzo_path: &'a Path,
+    pub openapi_path: &'a Path,
+    pub output_path: Option<&'a Path>,
+    pub target: &'a str,
+    pub workflow_id: Option<&'a str>,
+    pub base_url: Option<&'a str>,
+    pub vus: Option<u32>,
+    pub duration: Option<&'a str>,
+    pub iterations: Option<u32>,
+}
+
+/// `execute_run` に渡す引数をまとめた構造体
+pub struct RunCommandArgs<'a> {
+    pub arazzo_path: &'a Path,
+    pub openapi_path: &'a Path,
+    pub engine: &'a str,
+    pub workflow_id: Option<&'a str>,
+    pub base_url: Option<&'a str>,
+    pub vus: Option<u32>,
+    pub duration: Option<&'a str>,
+    pub iterations: Option<u32>,
+}
+
+/// 変換コマンドを実行する
+pub fn execute_convert(args: ConvertCommandArgs<'_>) -> Result<()> {
+    let ConvertCommandArgs {
+        arazzo_path,
+        openapi_path,
+        output_path,
+        target,
+        workflow_id,
+        base_url,
+        vus,
+        duration,
+        iterations,
+    } = args;
+
+    // Arazzoファイルを読み込む
     let arazzo = load_arazzo(arazzo_path)?;
     println!(
         "{} Loaded Arazzo file: {}",
@@ -29,7 +56,7 @@ pub fn execute_convert(
         arazzo_path.display()
     );
 
-    // Load OpenAPI file
+    // OpenAPIファイルを読み込む
     let openapi = load_openapi(openapi_path)?;
     println!(
         "{} Loaded OpenAPI file: {}",
@@ -37,7 +64,7 @@ pub fn execute_convert(
         openapi_path.display()
     );
 
-    // Build convert options
+    // 変換オプションを組み立てる
     let options = ConvertOptions {
         base_url: base_url.map(|s| s.to_string()),
         vus,
@@ -45,13 +72,13 @@ pub fn execute_convert(
         iterations,
     };
 
-    // Generate script based on target
+    // ターゲットに応じてスクリプトを生成する
     let script = match target.to_lowercase().as_str() {
         "k6" => {
             let converter = K6Converter::new();
 
             if let Some(wf_id) = workflow_id {
-                // Convert specific workflow
+                // 特定のワークフローのみ変換
                 let workflow = arazzo
                     .workflows
                     .iter()
@@ -65,7 +92,7 @@ pub fn execute_convert(
 
                 converter.convert_workflow(workflow, &openapi, &options)?
             } else {
-                // Convert all workflows
+                // 全ワークフローを変換
                 converter.convert_spec(&arazzo, &openapi, &options)?
             }
         }
@@ -77,7 +104,7 @@ pub fn execute_convert(
         }
     };
 
-    // Output result
+    // 生成結果を出力する
     if let Some(path) = output_path {
         fs::write(path, &script)?;
         println!(
@@ -93,23 +120,25 @@ pub fn execute_convert(
     Ok(())
 }
 
-/// Execute the run command (convert and run)
-pub fn execute_run(
-    arazzo_path: &Path,
-    openapi_path: &Path,
-    engine: &str,
-    workflow_id: Option<&str>,
-    base_url: Option<&str>,
-    vus: Option<u32>,
-    duration: Option<&str>,
-    iterations: Option<u32>,
-) -> Result<()> {
+/// 変換と実行をまとめて行う `run` コマンドを実行する
+pub fn execute_run(args: RunCommandArgs<'_>) -> Result<()> {
+    let RunCommandArgs {
+        arazzo_path,
+        openapi_path,
+        engine,
+        workflow_id,
+        base_url,
+        vus,
+        duration,
+        iterations,
+    } = args;
+
     use crate::runner::{K6Runner, Runner};
 
-    // First, generate the script
+    // まずスクリプトを生成する
     println!("{} Generating test script...", "→".blue());
 
-    // Load files
+    // 入力ファイルを読み込む
     let arazzo = load_arazzo(arazzo_path)?;
     let openapi = load_openapi(openapi_path)?;
 
@@ -125,7 +154,7 @@ pub fn execute_run(
             let converter = K6Converter::new();
             let runner = K6Runner::new();
 
-            // Check if k6 is available
+            // k6が利用可能か確認する
             if !runner.is_available() {
                 return Err(crate::error::HornetError::ValidationError(
                     "k6 is not installed or not in PATH. Please install k6 first: https://k6.io/docs/get-started/installation/"
@@ -148,7 +177,7 @@ pub fn execute_run(
                     })?;
                 converter.convert_workflow(workflow, &openapi, &options)?
             } else {
-                // Use first workflow
+                // ワークフロー未指定時は先頭を使用
                 converter.convert_workflow(&arazzo.workflows[0], &openapi, &options)?
             };
 
@@ -156,7 +185,7 @@ pub fn execute_run(
 
             let result = runner.run_script_content(&script)?;
 
-            // Print output
+            // 実行結果の標準出力・標準エラーを表示
             if !result.stdout.is_empty() {
                 println!("{}", result.stdout);
             }
@@ -165,7 +194,7 @@ pub fn execute_run(
                 eprintln!("{}", result.stderr);
             }
 
-            // Print summary
+            // サマリーを表示
             if result.success {
                 println!("\n{} Test run completed successfully!", "✓".green());
             } else {
