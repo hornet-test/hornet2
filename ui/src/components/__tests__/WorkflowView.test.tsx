@@ -69,7 +69,8 @@ describe('WorkflowView', () => {
 
   test('renders workflow steps', () => {
     render(<WorkflowView />);
-    expect(screen.getByText('Main Workflow')).toBeInTheDocument();
+    expect(screen.getByText('Current Workflow')).toBeInTheDocument();
+    expect(screen.getByText('default')).toBeInTheDocument();
     expect(screen.getByText('2 Steps')).toBeInTheDocument();
   });
 
