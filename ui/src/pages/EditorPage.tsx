@@ -3,6 +3,7 @@ import { OperationList } from '../components/OperationList';
 import { WorkflowView } from '../components/WorkflowView';
 import { YamlEditor } from '../components/YamlEditor';
 import { DataSourcePanel } from '../components/DataSourcePanel';
+import { SuggestionPanel } from '../components/SuggestionPanel';
 import { useEditorStore } from '../stores/editorStore';
 
 export const EditorPage: React.FC = () => {
@@ -18,6 +19,11 @@ export const EditorPage: React.FC = () => {
     addDataMapping,
     removeDataMapping,
     arazzoSpec,
+    suggestionPanelOpen,
+    toggleSuggestionPanel,
+    dataFlowSuggestions,
+    applySuggestion,
+    dismissSuggestion,
   } = useEditorStore();
   const [viewMode, setViewMode] = useState<'visual' | 'yaml' | 'split'>('split');
 
@@ -101,7 +107,16 @@ export const EditorPage: React.FC = () => {
               <span className="badge">{dataSources.length}</span>
             )}
           </button>
-        </div>
+          <button
+            className={`data-source-toggle ${suggestionPanelOpen ? 'active' : ''}`}
+            onClick={toggleSuggestionPanel}
+          >
+            💡 Suggestions
+            {dataFlowSuggestions.length > 0 && (
+              <span className="badge">{dataFlowSuggestions.length}</span>
+            )}
+          </button>
+         </div>
       </div>
 
       <div className="editor-layout">
@@ -141,6 +156,16 @@ export const EditorPage: React.FC = () => {
                 targetOperation={targetOperation}
                 onMapData={addDataMapping}
                 onRemoveMapping={removeDataMapping}
+              />
+            </div>
+          )}
+
+          {suggestionPanelOpen && (
+            <div className="data-source-sidebar">
+              <SuggestionPanel
+                suggestions={dataFlowSuggestions}
+                onApplySuggestion={applySuggestion}
+                onDismissSuggestion={dismissSuggestion}
               />
             </div>
           )}

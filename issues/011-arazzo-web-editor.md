@@ -73,7 +73,7 @@ interface OpenAPIOperation {
 - メインエリアにワークフローステップをビジュアル表示
 - ドラッグ&ドロップでステップを並び替え可能
 
-### 2. 同名パラメータ認識とデータ受け渡しサポート 🚧 部分実装
+### 2. 同名パラメータ認識とデータ受け渡しサポート ✅ Phase 2 実装済み
 
 **実装済み要件**:
 - ✅ 基本的なステップ間データフロー（`$steps.xxx.outputs.yyy` の記述）
@@ -205,9 +205,13 @@ function validateArazzoYaml(yamlStr: string): ValidationError[] {
     const parsed = yaml.load(yamlStr);
     return validateArazzoSpec(parsed); // #001 のバリデータを使用
   } catch (e) {
-    return [{ line: e.mark.line, message: e.message }];
+    if (e.mark) {
+        return [{ line: e.mark.line, message: e.message }];
+    }
+    return [{ message: e.message }];
   }
 }
+
 ```
 
 **UI レイアウト**:
@@ -393,7 +397,7 @@ useEffect(() => {
 - [x] `src/server/api.rs`: エディタ用 API エンドポイント ✅
   - `GET /api/editor/operations`: Operation 一覧取得
   - `POST /api/editor/validate`: Arazzo YAML バリデーション
-  - response_codes 抽出機能
+  - response_codes 抽出機能 ✅
 - [ ] `src/editor/links_detector.rs`: OAS links 解析ロジック (Phase 2)
 - [ ] `src/editor/workflow_suggester.rs`: ワークフロー提案ロジック (Phase 2)
 - [ ] `src/editor/data_flow_analyzer.rs`: データフロー解析 (Phase 2)
@@ -409,7 +413,7 @@ useEffect(() => {
 - [x] `ui/src/App.tsx`: ナビゲーション統合 ✅
 - [ ] `ui/src/components/DataFlowMapper.tsx`: データマッピング UI (Phase 2)
 - [ ] `ui/src/components/PropertyPanel.tsx`: プロパティ編集パネル (Phase 2)
-- [ ] `ui/src/components/SuggestionPanel.tsx`: 提案パネル (Phase 2)
+- [x] `ui/src/components/SuggestionPanel.tsx`: 提案パネル (Phase 2) ✅
 - [ ] `ui/src/utils/arazzoGenerator.ts`: YAML 生成ユーティリティ (Phase 2)
 - [ ] `ui/src/utils/schemaFormGenerator.ts`: スキーマベースフォーム生成 (Phase 2)
 
@@ -542,7 +546,6 @@ make dev
 
 ### 優先度高
 - OAS links 認識とワークフロー提案
-- データフロー自動検出とサジェスト
 - ドラッグ&ドロップでのステップ並び替え
 
 ### 優先度中
@@ -554,6 +557,7 @@ make dev
 - AI アシスタント機能
 - Undo/Redo
 - コラボレーション機能
+- データフロー自動検出とサジェスト (実装済み)
 
 ### 関連タスク
 - **#005 k6 DSL 変換**: エディタから k6 スクリプト生成

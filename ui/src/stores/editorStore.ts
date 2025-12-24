@@ -28,6 +28,7 @@ interface EditorState {
   selectedOperation: OperationInfo | null;
   selectedStepId: string | null;
   dataSourcePanelOpen: boolean;
+  suggestionPanelOpen: boolean;
   isLoading: boolean;
   error: string | null;
 
@@ -41,6 +42,7 @@ interface EditorState {
   setSelectedOperation: (operation: OperationInfo | null) => void;
   setSelectedStepId: (stepId: string | null) => void;
   toggleDataSourcePanel: () => void;
+  toggleSuggestionPanel: () => void;
   addOperationToWorkflow: (operation: OperationInfo) => void;
   analyzeDataFlows: () => void;
   applySuggestion: (suggestion: DataFlowSuggestion) => void;
@@ -77,6 +79,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedOperation: null,
   selectedStepId: null,
   dataSourcePanelOpen: false,
+  suggestionPanelOpen: false,
   isLoading: false,
   error: null,
 
@@ -186,7 +189,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   // Toggle data source panel
   toggleDataSourcePanel: () => {
-    set((state) => ({ dataSourcePanelOpen: !state.dataSourcePanelOpen }));
+    set((state) => ({
+      dataSourcePanelOpen: !state.dataSourcePanelOpen,
+      suggestionPanelOpen: false, // Close suggestion panel when data source panel opens
+    }));
+  },
+
+  // Toggle suggestion panel
+  toggleSuggestionPanel: () => {
+    set((state) => ({
+      suggestionPanelOpen: !state.suggestionPanelOpen,
+      dataSourcePanelOpen: false, // Close data source panel when suggestion panel opens
+    }));
   },
 
   // Get available data sources for the selected step
@@ -533,6 +547,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedOperation: null,
       selectedStepId: null,
       dataSourcePanelOpen: false,
+      suggestionPanelOpen: false,
       error: null,
     });
   },
