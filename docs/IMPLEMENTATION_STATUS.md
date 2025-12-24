@@ -1,6 +1,6 @@
 # hornet2 実装状況
 
-最終更新: 2024-12-03
+最終更新: 2024-12-04
 
 ## Phase 1: 可視化 (MVP)
 
@@ -15,7 +15,7 @@
 
 | # | タスク | ステータス | 完了日 |
 |---|--------|-----------|--------|
-| [#005](../issues/005-k6-dsl-conversion.md) | 外部ツール (k6) への DSL 変換 | 📋 未着手 | - |
+| [#005](../issues/005-k6-dsl-conversion.md) | 外部ツール (k6) への DSL 変換 | ✅ 完了 | 2024-12-04 |
 | [#006](../issues/006-test-automation.md) | テスト実行の自動化 | 📋 未着手 | - |
 | [#007](../issues/007-result-report-generation.md) | 結果レポートの生成 | 📋 未着手 | - |
 
@@ -28,6 +28,73 @@
 | [#010](../issues/010-optimization.md) | 並列実行・非同期最適化 | 📋 未着手 | - |
 
 ## 最新の成果
+
+### #005 外部ツール (k6) への DSL 変換 ✅
+
+**実装内容**:
+- k6 スクリプト生成ロジック (`src/converters/k6.rs`)
+- Converter トレイト定義 (`src/converters/mod.rs`)
+- k6 実行ランナー (`src/runner/k6.rs`, `src/runner/mod.rs`)
+- CLI コマンド: `convert` と `run`
+
+**CLI コマンド**:
+```bash
+# k6 スクリプトを生成
+$ cargo run -- convert --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --to k6
+✓ Loaded Arazzo file: tests/fixtures/arazzo.yaml
+✓ Loaded OpenAPI file: tests/fixtures/openapi.yaml
+# k6 JavaScript スクリプトが出力される
+
+# ファイルに出力
+$ cargo run -- convert --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --to k6 --output script.js
+✓ Generated k6 script: script.js
+
+# 特定のワークフローのみ変換
+$ cargo run -- convert --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --workflow user-onboarding-flow
+
+# k6 でテスト実行 (k6 がインストールされている場合)
+$ cargo run -- run --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --engine k6
+```
+
+**主要機能**:
+- Arazzo ワークフローから k6 JavaScript スクリプトを自動生成
+- ランタイム式 (`$inputs.*`, `$steps.*.outputs.*`, `$response.body.*`) を JavaScript 変数に変換
+- `successCriteria` を k6 の `check()` に変換
+- ステップ間のデータ依存関係を変数で表現
+- 負荷テストオプション (vus, duration, iterations) のサポート
+- k6 実行結果のパースとメトリクス表示
+
+**生成されるスクリプト例**:
+```javascript
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+
+export let options = {
+  vus: 1,
+  iterations: 1,
+};
+
+export default function () {
+  let inputs = {
+    username: "testuser",
+    password: "securePassword123",
+  };
+
+  // Step: login - Login user
+  let login_response = http.post("https://api.example.com/login", JSON.stringify({
+    "password": inputs.password,
+    "username": inputs.username
+  }), {
+    headers: { 'Content-Type': "application/json" }
+  });
+  check(login_response, {
+    'check_1': (r) => login_response.status === 200
+  });
+  let login_token = login_response.json('token');
+
+  sleep(1);
+}
+```
 
 ### #003 Web UIでの可視化 ✅
 
@@ -98,16 +165,16 @@ $ cargo run -- visualize tests/fixtures/arazzo.yaml --format json
 
 ## プロジェクト統計
 
-- **総コミット数**: 7
-- **実装済み機能**: 3/10 (30%)
-- **テストカバレッジ**: 29 tests
-- **コード行数**: ~4,000 LOC
+- **総コミット数**: 8
+- **実装済み機能**: 4/10 (40%)
+- **テストカバレッジ**: 36 tests
+- **コード行数**: ~5,000 LOC
 
 ## 次のマイルストーン
 
-次は **#004 CLIでの基本操作** に進みます。
+次は **#006 テスト実行の自動化** に進みます。
 
-### #004 CLI での基本操作
-- clap を使った本格的な CLI
-- list / validate / visualize コマンドの統合
-- 複数ワークフローの処理
+### #006 テスト実行の自動化
+- k6 を使ったテスト実行の自動化
+- テスト結果の収集と表示
+- CI/CD との統合

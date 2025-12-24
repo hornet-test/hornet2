@@ -63,6 +63,80 @@ pub enum Commands {
         #[arg(short, long, default_value = "3000")]
         port: u16,
     },
+
+    /// Convert Arazzo workflow to test script
+    Convert {
+        /// Path to Arazzo file
+        #[arg(short, long)]
+        arazzo: PathBuf,
+
+        /// Path to OpenAPI file
+        #[arg(short, long)]
+        openapi: PathBuf,
+
+        /// Target format (k6)
+        #[arg(short, long, default_value = "k6")]
+        to: String,
+
+        /// Output file (stdout if not specified)
+        #[arg(short = 'O', long)]
+        output: Option<PathBuf>,
+
+        /// Specific workflow ID to convert (all if not specified)
+        #[arg(short, long)]
+        workflow: Option<String>,
+
+        /// Base URL override for API requests
+        #[arg(long)]
+        base_url: Option<String>,
+
+        /// Number of virtual users (for load testing)
+        #[arg(long)]
+        vus: Option<u32>,
+
+        /// Duration of the test (e.g., "30s", "5m")
+        #[arg(long)]
+        duration: Option<String>,
+
+        /// Number of iterations (mutually exclusive with duration)
+        #[arg(long)]
+        iterations: Option<u32>,
+    },
+
+    /// Run tests using an external engine
+    Run {
+        /// Path to Arazzo file
+        #[arg(short, long)]
+        arazzo: PathBuf,
+
+        /// Path to OpenAPI file
+        #[arg(short, long)]
+        openapi: PathBuf,
+
+        /// Test engine to use (k6)
+        #[arg(short, long, default_value = "k6")]
+        engine: String,
+
+        /// Specific workflow ID to run (first workflow if not specified)
+        #[arg(short, long)]
+        workflow: Option<String>,
+
+        /// Base URL override for API requests
+        #[arg(long)]
+        base_url: Option<String>,
+
+        /// Number of virtual users (for load testing)
+        #[arg(long)]
+        vus: Option<u32>,
+
+        /// Duration of the test (e.g., "30s", "5m")
+        #[arg(long)]
+        duration: Option<String>,
+
+        /// Number of iterations (mutually exclusive with duration)
+        #[arg(long)]
+        iterations: Option<u32>,
+    },
 }
 
 #[derive(Clone, ValueEnum)]
