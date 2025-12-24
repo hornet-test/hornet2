@@ -1,79 +1,79 @@
-# Design for Local Arazzo File CRUD API
+# ローカルArazzoファイルCRUD APIの設計
 
-## Overview
-This document outlines the design for adding CRUD (Create, Read, Update, Delete) capabilities to the Hornet2 API server to allow modification of the local Arazzo specification file.
+## 概要
+このドキュメントは、ローカルのArazzo仕様ファイルを変更できるように、Hornet2 APIサーバーにCRUD（作成、読み取り、更新、削除）機能を追加するための設計概要です。
 
-## Goals
-- Allow the frontend to retrieve the complete Arazzo specification.
-- Allow the frontend to modify the Arazzo specification (update, add, delete workflows).
-- Persist changes to the local file system.
+## 目標
+- フロントエンドが完全なArazzo仕様を取得できるようにする。
+- フロントエンドがArazzo仕様を変更（ワークフローの更新、追加、削除）できるようにする。
+- 変更をローカルファイルシステムに永続化する。
 
-## Proposed API Endpoints
+## 提案するAPIエンドポイント
 
-### 1. Get Full Specification
-- **Endpoint**: `GET /api/spec`
-- **Description**: Returns the complete Arazzo specification structure.
-- **Response**: `200 OK` with JSON body containing the `ArazzoSpec`.
+### 1. 完全な仕様の取得
+- **エンドポイント**: `GET /api/spec`
+- **説明**: 完全なArazzo仕様構造を返します。
+- **レスポンス**: `ArazzoSpec`を含むJSONボディを持つ `200 OK`。
 
-### 2. Update Full Specification
-- **Endpoint**: `PUT /api/spec`
-- **Description**: Replaces the entire Arazzo specification with the provided JSON.
-- **Body**: JSON representation of `ArazzoSpec`.
-- **Behavior**:
-    1. Validates the received specification.
-    2. Serializes it to YAML.
-    3. Overwrites the file at `arazzo_path`.
-- **Response**: `200 OK` if successful, `400 Bad Request` if validation fails.
+### 2. 完全な仕様の更新
+- **エンドポイント**: `PUT /api/spec`
+- **説明**: 提供されたJSONでArazzo仕様全体を置き換えます。
+- **ボディ**: `ArazzoSpec`のJSON表現。
+- **動作**:
+    1. 受信した仕様を検証します。
+    2. YAMLにシリアライズします。
+    3. `arazzo_path`にあるファイルを上書きします。
+- **レスポンス**: 成功した場合は `200 OK`、検証に失敗した場合は `400 Bad Request`。
 
-### 3. Get Workflow
-- **Endpoint**: `GET /api/workflows/:workflow_id`
-- **Description**: Returns a single workflow by its ID.
-- **Response**: `200 OK` with `Workflow` object, or `404 Not Found`.
+### 3. ワークフローの取得
+- **エンドポイント**: `GET /api/workflows/:workflow_id`
+- **説明**: IDで指定された単一のワークフローを返します。
+- **レスポンス**: `Workflow`オブジェクトを持つ `200 OK`、または `404 Not Found`。
 
-### 4. Create/Update Workflow
-- **Endpoint**: `PUT /api/workflows/:workflow_id`
-- **Description**: Creates or updates a workflow with the given ID.
-- **Body**: JSON representation of `Workflow`.
-- **Behavior**:
-    1. Loads the current Arazzo spec.
-    2. Checks if a workflow with `workflow_id` exists.
-    3. If it exists, updates it. If not, adds it to the list.
-    4. Validates the updated spec.
-    5. Saves to file.
-- **Response**: `200 OK` with the updated workflow.
+### 4. ワークフローの作成/更新
+- **エンドポイント**: `PUT /api/workflows/:workflow_id`
+- **説明**: 指定されたIDでワークフローを作成または更新します。
+- **ボディ**: `Workflow`のJSON表現。
+- **動作**:
+    1. 現在のArazzo仕様をロードします。
+    2. `workflow_id`を持つワークフローが存在するか確認します。
+    3. 存在する場合は更新します。存在しない場合はリストに追加します。
+    4. 更新された仕様を検証します。
+    5. ファイルに保存します。
+- **レスポンス**: 更新されたワークフローを持つ `200 OK`。
 
-### 5. Delete Workflow
-- **Endpoint**: `DELETE /api/workflows/:workflow_id`
-- **Description**: Deletes a workflow by its ID.
-- **Behavior**:
-    1. Loads the current Arazzo spec.
-    2. Removes the workflow with `workflow_id`.
-    3. Saves to file.
-- **Response**: `200 OK`, or `404 Not Found` if it didn't exist.
+### 5. ワークフローの削除
+- **エンドポイント**: `DELETE /api/workflows/:workflow_id`
+- **説明**: IDで指定されたワークフローを削除します。
+- **動作**:
+    1. 現在のArazzo仕様をロードします。
+    2. `workflow_id`を持つワークフローを削除します。
+    3. ファイルに保存します。
+- **レスポンス**: `200 OK`、存在しなかった場合は `404 Not Found`。
 
-## Implementation Details
+## 実装の詳細
 
-### Data Persistence
-- The server currently reads the Arazzo file on every request.
-- For write operations, we will read, modify, and then write back to the same path using `fs::write`.
-- We need to ensure that `serde_yaml` is used for serialization to maintain the file format.
+### データの永続化
+- サーバーは現在、リクエストごとにArazzoファイルを読み込んでいます。
+- 書き込み操作のために、読み込み、変更、そして `fs::write` を使用して同じパスに書き戻します。
+- ファイル形式を維持するために `serde_yaml` を使用してシリアライズする必要があります。
 
-### Validation
-- Reuse existing `validate()` methods in `ArazzoSpec`, `Workflow`, etc.
-- Ensure that modifying one part doesn't break references (though deep referential integrity checks might be out of scope for MVP, basic ID uniqueness checks are already in place).
+### 検証
+- `ArazzoSpec`、`Workflow` などにある既存の `validate()` メソッドを再利用します。
+- 一部を変更しても参照が壊れないことを確認します（ただし、深い参照整合性チェックはMVPの範囲外とし、基本的なIDの一意性チェックは既存のものを使用します）。
 
-### Error Handling
-- Return appropriate HTTP status codes (400 for validation errors, 404 for not found, 500 for IO errors).
-- Return descriptive error messages.
+### エラーハンドリング
+- 適切なHTTPステータスコードを返します（検証エラーの場合は400、見つからない場合は404、IOエラーの場合は500）。
+- 説明的なエラーメッセージを返します。
 
-## Security Considerations
-- This API allows modifying files on the server. Since this is a local development tool (implied by "local Arazzo file"), we assume the user has access to the file system anyway.
-- Basic path traversal checks are irrelevant here as the path is fixed at startup.
+## セキュリティに関する考慮事項
+- このAPIはサーバー上のファイルを変更することを許可します。これはローカル開発ツール（「ローカルArazzoファイル」という前提）であるため、ユーザーはファイルシステムへのアクセス権を持っていると想定されます。
+- パスは起動時に固定されるため、基本的なパストラバーサルチェックはここでは無関係です。
 
-## Plan
-1. Implement `save_arazzo` helper function in `loader` module.
-2. Implement `GET /api/spec` endpoint.
-3. Implement `PUT /api/spec` endpoint.
-4. Implement `GET`, `PUT`, `DELETE` for `/api/workflows/:workflow_id`.
-5. Register new routes in `server/mod.rs`.
-6. Add tests for the new endpoints.
+## 計画
+1. `loader` モジュールに `save_arazzo` ヘルパー関数を実装します。
+2. `GET /api/spec` エンドポイントを実装します。
+3. `PUT /api/spec` エンドポイントを実装します。
+4. `/api/workflows/:workflow_id` の `GET`、`PUT`、`DELETE` を実装します。
+5. `server/mod.rs` に新しいルートを登録します。
+6. 新しいエンドポイントのテストを追加します。

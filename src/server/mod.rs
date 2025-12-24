@@ -9,24 +9,24 @@ use std::net::SocketAddr;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber;
 
-/// Start the web server
+/// Webサーバーを起動する
 pub async fn start_server(
     addr: SocketAddr,
     arazzo_path: String,
     openapi_path: Option<String>,
 ) -> crate::Result<()> {
-    // Initialize tracing
+    // トレーシングを初期化
     tracing_subscriber::fmt::init();
 
-    // Create shared state
+    // 共有状態を作成
     let state = api::AppState {
         arazzo_path,
         openapi_path,
     };
 
-    // Build the router
+    // ルーターを構築
     let app = Router::new()
-        // API routes
+        // APIルート
         .route("/api/spec", get(api::get_spec).put(api::update_spec))
         .route("/api/workflows", get(api::get_workflows))
         .route(
@@ -36,11 +36,11 @@ pub async fn start_server(
                 .delete(api::delete_workflow),
         )
         .route("/api/graph/{workflow_id}", get(api::get_graph))
-        // Static files (CSS, JS) - from dist folder
+        // 静的ファイル (CSS, JS) - distフォルダから
         .route("/assets/{*path}", get(serve_static))
-        // Root route serves index.html
+        // ルートルートはindex.htmlを提供
         .route("/", get(serve_index))
-        // Fallback for SPA routing - serve index.html for all other routes
+        // SPAルーティングのフォールバック - 他のすべてのルートに対してindex.htmlを提供
         .fallback(serve_index)
         .with_state(state)
         .layer(CorsLayer::permissive());
@@ -48,14 +48,14 @@ pub async fn start_server(
     tracing::info!("Starting server on http://{}", addr);
     tracing::info!("Open http://{} in your browser", addr);
 
-    // Start the server
+    // サーバーを起動
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
 
     Ok(())
 }
 
-/// Serve static files (CSS, JS, etc.) from ui/dist/assets/
+/// ui/dist/assets/ から静的ファイル (CSS, JS, etc.) を提供する
 async fn serve_static(
     axum::extract::Path(path): axum::extract::Path<String>,
 ) -> Result<axum::response::Response, StatusCode> {
@@ -74,12 +74,12 @@ async fn serve_static(
     }
 }
 
-/// Serve index.html from ui/dist/ (production build)
+/// ui/dist/ (本番ビルド) から index.html を提供する
 async fn serve_index() -> Result<axum::response::Html<String>, StatusCode> {
     match tokio::fs::read_to_string("ui/dist/index.html").await {
         Ok(content) => Ok(axum::response::Html(content)),
         Err(_) => {
-            // If dist/index.html doesn't exist, show a helpful message
+            // dist/index.html が存在しない場合、役立つメッセージを表示
             let dev_message = r#"
 <!DOCTYPE html>
 <html>

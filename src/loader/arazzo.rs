@@ -3,37 +3,37 @@ use crate::models::arazzo::ArazzoSpec;
 use std::fs;
 use std::path::Path;
 
-/// Load an Arazzo specification from a file
+/// ファイルからArazzo仕様をロードする
 pub fn load_arazzo<P: AsRef<Path>>(path: P) -> Result<ArazzoSpec> {
     let path = path.as_ref();
 
-    // Read the file
+    // ファイルを読み込む
     let content = fs::read_to_string(path).map_err(|e| {
         HornetError::ArazzoLoadError(format!("Failed to read file {}: {}", path.display(), e))
     })?;
 
-    // Parse YAML
+    // YAMLをパースする
     let spec: ArazzoSpec = serde_yaml::from_str(&content)
         .map_err(|e| HornetError::ArazzoLoadError(format!("Failed to parse Arazzo YAML: {}", e)))?;
 
-    // Validate
+    // 検証する
     spec.validate()?;
 
     Ok(spec)
 }
 
-/// Save an Arazzo specification to a file
+/// Arazzo仕様をファイルに保存する
 pub fn save_arazzo<P: AsRef<Path>>(path: P, spec: &ArazzoSpec) -> Result<()> {
     let path = path.as_ref();
 
-    // Validate before saving
+    // 保存前に検証する
     spec.validate()?;
 
-    // Serialize to YAML
+    // YAMLにシリアライズする
     let yaml = serde_yaml::to_string(spec)
         .map_err(|e| HornetError::ArazzoLoadError(format!("Failed to serialize Arazzo to YAML: {}", e)))?;
 
-    // Write to file
+    // ファイルに書き込む
     fs::write(path, yaml).map_err(|e| {
         HornetError::ArazzoLoadError(format!("Failed to write file {}: {}", path.display(), e))
     })?;

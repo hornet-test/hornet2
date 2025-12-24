@@ -11,14 +11,14 @@ use crate::{
     models::arazzo::{ArazzoSpec, Workflow},
 };
 
-/// Shared application state
+/// 共有アプリケーション状態
 #[derive(Clone)]
 pub struct AppState {
     pub arazzo_path: String,
     pub openapi_path: Option<String>,
 }
 
-/// Response for /api/workflows
+/// /api/workflows のレスポンス
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WorkflowsResponse {
     pub workflows: Vec<WorkflowInfo>,
@@ -32,7 +32,7 @@ pub struct WorkflowInfo {
     pub steps: usize,
 }
 
-/// GET /api/spec - Get full Arazzo specification
+/// GET /api/spec - 完全なArazzo仕様を取得
 pub async fn get_spec(
     State(state): State<AppState>,
 ) -> Result<Json<ArazzoSpec>, (StatusCode, String)> {
@@ -46,7 +46,7 @@ pub async fn get_spec(
     Ok(Json(arazzo))
 }
 
-/// PUT /api/spec - Update full Arazzo specification
+/// PUT /api/spec - 完全なArazzo仕様を更新
 pub async fn update_spec(
     State(state): State<AppState>,
     Json(spec): Json<ArazzoSpec>,
@@ -61,11 +61,11 @@ pub async fn update_spec(
     Ok(Json(spec))
 }
 
-/// GET /api/workflows - List all workflows
+/// GET /api/workflows - すべてのワークフローをリスト
 pub async fn get_workflows(
     State(state): State<AppState>,
 ) -> Result<Json<WorkflowsResponse>, (StatusCode, String)> {
-    // Load Arazzo file
+    // Arazzoファイルをロード
     let arazzo = loader::load_arazzo(&state.arazzo_path).map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -87,7 +87,7 @@ pub async fn get_workflows(
     Ok(Json(WorkflowsResponse { workflows }))
 }
 
-/// GET /api/workflows/:workflow_id - Get a specific workflow
+/// GET /api/workflows/:workflow_id - 特定のワークフローを取得
 pub async fn get_workflow(
     State(state): State<AppState>,
     Path(workflow_id): Path<String>,
@@ -113,7 +113,7 @@ pub async fn get_workflow(
     Ok(Json(workflow))
 }
 
-/// PUT /api/workflows/:workflow_id - Update or create a workflow
+/// PUT /api/workflows/:workflow_id - ワークフローを更新または作成
 pub async fn update_workflow(
     State(state): State<AppState>,
     Path(workflow_id): Path<String>,
@@ -141,10 +141,10 @@ pub async fn update_workflow(
         .iter()
         .position(|w| w.workflow_id == workflow_id)
     {
-        // Update existing workflow
+        // 既存のワークフローを更新
         arazzo.workflows[pos] = workflow.clone();
     } else {
-        // Add new workflow
+        // 新しいワークフローを追加
         arazzo.workflows.push(workflow.clone());
     }
 
@@ -158,7 +158,7 @@ pub async fn update_workflow(
     Ok(Json(workflow))
 }
 
-/// DELETE /api/workflows/:workflow_id - Delete a workflow
+/// DELETE /api/workflows/:workflow_id - ワークフローを削除
 pub async fn delete_workflow(
     State(state): State<AppState>,
     Path(workflow_id): Path<String>,
@@ -190,12 +190,12 @@ pub async fn delete_workflow(
     Ok(StatusCode::OK)
 }
 
-/// GET /api/graph/:workflow_id - Get graph for a specific workflow
+/// GET /api/graph/:workflow_id - 特定のワークフローのグラフを取得
 pub async fn get_graph(
     State(state): State<AppState>,
     Path(workflow_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    // Load Arazzo file
+    // Arazzoファイルをロード
     let arazzo = loader::load_arazzo(&state.arazzo_path).map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -203,7 +203,7 @@ pub async fn get_graph(
         )
     })?;
 
-    // Load OpenAPI file if provided
+    // OpenAPIファイルが提供されている場合はロード
     let openapi = if let Some(ref path) = state.openapi_path {
         Some(loader::load_openapi(path).map_err(|e| {
             (
@@ -215,7 +215,7 @@ pub async fn get_graph(
         None
     };
 
-    // Find the workflow
+    // ワークフローを検索
     let workflow = arazzo
         .workflows
         .iter()
@@ -227,7 +227,7 @@ pub async fn get_graph(
             )
         })?;
 
-    // Build graph
+    // グラフを構築
     let graph = build_flow_graph(workflow, openapi.as_ref()).map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -235,7 +235,7 @@ pub async fn get_graph(
         )
     })?;
 
-    // Export to JSON
+    // JSONにエクスポート
     let json = export_json(&graph).map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
