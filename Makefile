@@ -1,4 +1,4 @@
-.PHONY: help install build dev test clean ui-dev cli-dev ui-build ui-test cli-build cli-test stop-dev ui-lint ui-format lint
+.PHONY: help install build dev test clean ui-dev cli-dev ui-build ui-test cli-build cli-test stop-dev ui-lint ui-format ui-typecheck lint
 
 # デフォルトターゲット
 .DEFAULT_GOAL := help
@@ -43,6 +43,11 @@ ui-lint: ## UIのLintを実行
 	@echo "$(BLUE)Running UI lint...$(NC)"
 	@cd ui && pnpm lint
 	@echo "$(GREEN)✓ UI lint passed$(NC)"
+
+ui-typecheck: ## UIの型チェックを実行
+	@echo "$(BLUE)Running UI typecheck...$(NC)"
+	@cd ui && pnpm typecheck
+	@echo "$(GREEN)✓ UI typecheck passed$(NC)"
 
 ui-format: ## UIのコードを整形
 	@echo "$(BLUE)Formatting UI code...$(NC)"
@@ -96,6 +101,7 @@ check: ## コードのチェック（フォーマット・lint）
 	@cargo fmt --check
 	@cargo clippy -- -D warnings
 	@echo "$(BLUE)Checking UI code...$(NC)"
+	@cd ui && pnpm typecheck
 	@cd ui && pnpm lint
 	@echo "$(GREEN)✓ Code check passed$(NC)"
 
