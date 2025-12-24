@@ -22,6 +22,25 @@ pub fn load_arazzo<P: AsRef<Path>>(path: P) -> Result<ArazzoSpec> {
     Ok(spec)
 }
 
+/// Save an Arazzo specification to a file
+pub fn save_arazzo<P: AsRef<Path>>(path: P, spec: &ArazzoSpec) -> Result<()> {
+    let path = path.as_ref();
+
+    // Validate before saving
+    spec.validate()?;
+
+    // Serialize to YAML
+    let yaml = serde_yaml::to_string(spec)
+        .map_err(|e| HornetError::ArazzoLoadError(format!("Failed to serialize Arazzo to YAML: {}", e)))?;
+
+    // Write to file
+    fs::write(path, yaml).map_err(|e| {
+        HornetError::ArazzoLoadError(format!("Failed to write file {}: {}", path.display(), e))
+    })?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -151,5 +170,40 @@ workflows:
     fn test_load_nonexistent_file() {
         let result = load_arazzo("/nonexistent/file.yaml");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_save_arazzo() {
+        let yaml = r#"
+arazzo: 1.0.0
+info:
+  title: Test Workflow
+  version: 1.0.0
+sourceDescriptions:
+  - name: api
+    url: openapi.yaml
+workflows:
+  - workflowId: test-flow
+    steps:
+      - stepId: step1
+        operationId: getTest
+"#;
+        // First load it
+        let mut input_file = NamedTempFile::new().unwrap();
+        input_file.write_all(yaml.as_bytes()).unwrap();
+        let spec = load_arazzo(input_file.path()).unwrap();
+
+        // Then save it to a new file
+        let output_file = NamedTempFile::new().unwrap();
+        let output_path = output_file.path().to_path_buf(); // Keep path before file drops
+
+        let result = save_arazzo(&output_path, &spec);
+        assert!(result.is_ok());
+
+        // Read it back and verify
+        let saved_spec = load_arazzo(&output_path).unwrap();
+        assert_eq!(saved_spec.info.title, "Test Workflow");
+        assert_eq!(saved_spec.workflows.len(), 1);
+        assert_eq!(saved_spec.workflows[0].workflow_id, "test-flow");
     }
 }

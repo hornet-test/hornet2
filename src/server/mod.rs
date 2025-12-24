@@ -1,6 +1,10 @@
 pub mod api;
 
-use axum::{http::StatusCode, routing::get, Router};
+use axum::{
+    http::StatusCode,
+    routing::{delete, get, put},
+    Router,
+};
 use std::net::SocketAddr;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber;
@@ -23,7 +27,14 @@ pub async fn start_server(
     // Build the router
     let app = Router::new()
         // API routes
+        .route("/api/spec", get(api::get_spec).put(api::update_spec))
         .route("/api/workflows", get(api::get_workflows))
+        .route(
+            "/api/workflows/{workflow_id}",
+            get(api::get_workflow)
+                .put(api::update_workflow)
+                .delete(api::delete_workflow),
+        )
         .route("/api/graph/{workflow_id}", get(api::get_graph))
         // Static files (CSS, JS) - from dist folder
         .route("/assets/{*path}", get(serve_static))
@@ -139,7 +150,9 @@ cargo run -- serve --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/
         <h2>📡 API Endpoints</h2>
         <p>The following API endpoints are available:</p>
         <ul>
+            <li><code>GET/PUT /api/spec</code> - Get/Update full spec</li>
             <li><code>GET /api/workflows</code> - List all workflows</li>
+            <li><code>GET/PUT/DELETE /api/workflows/{workflow_id}</code> - Manage workflows</li>
             <li><code>GET /api/graph/{workflow_id}</code> - Get workflow graph</li>
         </ul>
     </div>
