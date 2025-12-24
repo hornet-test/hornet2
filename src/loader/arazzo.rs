@@ -30,8 +30,9 @@ pub fn save_arazzo<P: AsRef<Path>>(path: P, spec: &ArazzoSpec) -> Result<()> {
     spec.validate()?;
 
     // YAMLにシリアライズする
-    let yaml = serde_yaml::to_string(spec)
-        .map_err(|e| HornetError::ArazzoLoadError(format!("Failed to serialize Arazzo to YAML: {}", e)))?;
+    let yaml = serde_yaml::to_string(spec).map_err(|e| {
+        HornetError::ArazzoLoadError(format!("Failed to serialize Arazzo to YAML: {}", e))
+    })?;
 
     // ファイルに書き込む
     fs::write(path, yaml).map_err(|e| {

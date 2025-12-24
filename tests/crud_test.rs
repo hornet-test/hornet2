@@ -3,9 +3,9 @@ use axum::{
     http::{Request, StatusCode},
 };
 use hornet2::server::api;
+use std::io::Write;
 use tempfile::NamedTempFile;
 use tower::util::ServiceExt; // for oneshot
-use std::io::Write;
 
 #[tokio::test]
 async fn test_crud_api() {
@@ -35,7 +35,10 @@ workflows:
 
     // Build app directly (bypassing start_server to avoid binding ports)
     let app = axum::Router::new()
-        .route("/api/spec", axum::routing::get(api::get_spec).put(api::update_spec))
+        .route(
+            "/api/spec",
+            axum::routing::get(api::get_spec).put(api::update_spec),
+        )
         .route("/api/workflows", axum::routing::get(api::get_workflows))
         .route(
             "/api/workflows/{workflow_id}",
@@ -58,7 +61,9 @@ workflows:
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::OK);
-    let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let spec: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
     assert_eq!(spec["info"]["title"], "Test Workflow");
 
