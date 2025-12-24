@@ -191,33 +191,70 @@ pub async fn get_operations(
                     .clone()
                     .unwrap_or_else(|| format!("{}_{}", method, path_str.replace('/', "_")));
 
+                // Helper to convert parameter object to ParameterInfo
+                let to_param_info = |p: &oas3::spec::Parameter| ParameterInfo {
+                    name: p.name.clone(),
+                    location: format!("{:?}", p.location).to_lowercase(),
+                    required: p.required.unwrap_or(false),
+                    schema_type: p.schema.as_ref().and_then(|s| match s {
+                        oas3::spec::ObjectOrReference::Object(schema) => {
+                            schema.schema_type.as_ref().map(|t| format!("{:?}", t))
+                        }
+                        _ => None,
+                    }),
+                    description: p.description.clone(),
+                };
+
                 // Extract parameters
                 let mut params = Vec::new();
                 for param in &op.parameters {
-                    if let oas3::spec::ObjectOrReference::Object(p) = param {
-                        params.push(ParameterInfo {
-                            name: p.name.clone(),
-                            location: format!("{:?}", p.location).to_lowercase(),
-                            required: p.required.unwrap_or(false),
-                            schema_type: p.schema.as_ref().and_then(|s| match s {
-                                oas3::spec::ObjectOrReference::Object(schema) => {
-                                    schema.schema_type.as_ref().map(|t| format!("{:?}", t))
+                    match param {
+                        oas3::spec::ObjectOrReference::Object(p) => {
+                            params.push(to_param_info(p));
+                        }
+                        oas3::spec::ObjectOrReference::Ref { ref_path, .. } => {
+                            // Try to resolve reference from components
+                            // Expected format: "#/components/parameters/Name"
+                            if let Some(components) = &openapi.components {
+                                if let Some(name) =
+                                    ref_path.strip_prefix("#/components/parameters/")
+                                {
+                                    if let Some(oas3::spec::ObjectOrReference::Object(p)) =
+                                        components.parameters.get(name)
+                                    {
+                                        params.push(to_param_info(p));
+                                    }
                                 }
-                                _ => None,
-                            }),
-                            description: p.description.clone(),
-                        });
+                            }
+                        }
                     }
                 }
 
+                // Helper to convert request body object to RequestBodyInfo
+                let to_body_info = |body: &oas3::spec::RequestBody| RequestBodyInfo {
+                    required: body.required.unwrap_or(false),
+                    content_types: body.content.keys().cloned().collect(),
+                    description: body.description.clone(),
+                };
+
                 // Extract request body info
                 let request_body = op.request_body.as_ref().and_then(|rb| match rb {
-                    oas3::spec::ObjectOrReference::Object(body) => Some(RequestBodyInfo {
-                        required: body.required.unwrap_or(false),
-                        content_types: body.content.keys().cloned().collect(),
-                        description: body.description.clone(),
-                    }),
-                    _ => None,
+                    oas3::spec::ObjectOrReference::Object(body) => Some(to_body_info(body)),
+                    oas3::spec::ObjectOrReference::Ref { ref_path, .. } => {
+                        // Try to resolve reference from components
+                        // Expected format: "#/components/requestBodies/Name"
+                        if let Some(components) = &openapi.components {
+                            if let Some(name) = ref_path.strip_prefix("#/components/requestBodies/")
+                            {
+                                if let Some(oas3::spec::ObjectOrReference::Object(body)) =
+                                    components.request_bodies.get(name)
+                                {
+                                    return Some(to_body_info(body));
+                                }
+                            }
+                        }
+                        None
+                    }
                 });
 
                 // Extract response codes
@@ -250,30 +287,120 @@ pub async fn get_operations(
                     }
 
                     success_response.and_then(|(code, response)| {
+                        // Helper to extract properties from schema
+                        let _extract_props_from_schema = |_schema: &oas3::spec::Schema| -> Option<ResponseSchemaInfo> {
+                            // Try to match Object variant if Schema is an enum
+                            // Note: oas3::spec::Schema might be an enum or have specific structure
+                            // Since we don't know exact definition, valid guess for oas3 crate:
+                            // Schema::Object(ObjectSchema)
+                            // or access properties via check
+
+                            // Trying pattern match assuming it is an enum or has properties field we missed?
+                            // Error said "no field properties".
+                            // If it's 0.20, maybe it is `Schema { kind: SchemaKind }`?
+                            // Let's try matching generic Object variant often found in such crates.
+
+                            // To be safe and debug, let's just return None for now if we can't access properties,
+                            // OR try to guess.
+                            // But I want to fix it.
+
+                            // Let's assume Schema delegates to ObjectSchema
+                            // Does Schema implement Deref?
+
+                            // Plan B: use debug formatting to extract? No.
+
+                            // Let's try:
+                            // if let Ok(obj) = schema.try_into() ... no.
+
+                            // Checking common oas3 usage:
+                            // Schema is struct with `schema_kind: SchemaKind`.
+                            // SchemaKind::Type(Type::Object(ObjectSchema))?
+
+                            // Given I can't check docs, I will stub it to return None for Schema type,
+                            // and rely on ObjectSchema paths which seem to work (since extract_props_from_obj_schema compiles?)
+                            // Wait, does extract_props_from_obj_schema compile?
+                            // Step 187 only complained about line 294 (extract_props_from_schema).
+                            // It did NOT complain about line 310 (extract_props_from_obj_schema).
+                            // So ObjectSchema HAS properties.
+
+                            // So if I can get ObjectSchema from Schema, I win.
+                            // I'll try matching Schema::Object(o).
+                            None                        };
+
+                        // Helper to extract properties from ObjectSchema
+                        let extract_props_from_obj_schema = |schema: &oas3::spec::ObjectSchema| -> Option<ResponseSchemaInfo> {
+                            // Extract top-level property names
+                            let properties: Vec<String> =
+                                schema.properties.keys().cloned().collect();
+
+                            if !properties.is_empty() {
+                                Some(ResponseSchemaInfo {
+                                    status_code: code.clone(),
+                                    properties,
+                                })
+                            } else {
+                                None
+                            }
+                        };
+
                         match response {
                             oas3::spec::ObjectOrReference::Object(resp) => {
                                 // Extract schema from first content type (usually application/json)
                                 resp.content.values().next().and_then(|media_type| {
                                     match &media_type.schema {
                                         Some(oas3::spec::ObjectOrReference::Object(schema)) => {
-                                            // Extract top-level property names
-                                            let properties: Vec<String> =
-                                                schema.properties.keys().cloned().collect();
-
-                                            if !properties.is_empty() {
-                                                Some(ResponseSchemaInfo {
-                                                    status_code: code,
-                                                    properties,
+                                            extract_props_from_obj_schema(schema)
+                                        }
+                                        Some(oas3::spec::ObjectOrReference::Ref { ref_path, .. }) => {
+                                            // Resolve schema reference
+                                            // Expected: "#/components/schemas/Name"
+                                            openapi.components.as_ref()
+                                                .and_then(|components| {
+                                                    ref_path.strip_prefix("#/components/schemas/")
+                                                        .and_then(|name| components.schemas.get(name))
                                                 })
-                                            } else {
-                                                None
-                                            }
+                                                .and_then(|resolved_schema_ref| {
+                                                    if let oas3::spec::ObjectOrReference::Object(schema) = resolved_schema_ref {
+                                                        extract_props_from_obj_schema(schema)
+                                                    } else {
+                                                        None
+                                                    }
+                                                })
                                         }
                                         _ => None,
                                     }
                                 })
                             }
-                            _ => None,
+                            oas3::spec::ObjectOrReference::Ref { ref_path, .. } => {
+                                // Resolve response reference
+                                // Expected: "#/components/responses/Name"
+                                if let Some(components) = &openapi.components {
+                                    if let Some(name) = ref_path.strip_prefix("#/components/responses/") {
+                                        if let Some(oas3::spec::ObjectOrReference::Object(resp)) = components.responses.get(name) {
+                                             return resp.content.values().next().and_then(|media_type| {
+                                                match &media_type.schema {
+                                                    Some(oas3::spec::ObjectOrReference::Object(schema)) => {
+                                                        extract_props_from_obj_schema(schema)
+                                                    }
+                                                    Some(oas3::spec::ObjectOrReference::Ref { ref_path, .. }) => {
+                                                        // Resolve nested schema reference
+                                                        if let Some(components) = &openapi.components {
+                                                            if let Some(name) = ref_path.strip_prefix("#/components/schemas/") {
+                                                                if let Some(oas3::spec::ObjectOrReference::Object(schema)) = components.schemas.get(name) {
+                                                                    return extract_props_from_obj_schema(schema);
+                                                                }
+                                                            }
+                                                        }
+                                                        None
+                                                    }
+                                                    _ => None,
+                                                }
+                                            });
+                                        }
+                                    }
+                                }
+                                None
+                            }
                         }
                     })
                 } else {
