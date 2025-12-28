@@ -1,6 +1,10 @@
 pub mod api;
 
-use axum::{http::StatusCode, routing::get, Router};
+use axum::{
+    http::StatusCode,
+    routing::{get, post},
+    Router,
+};
 use std::net::SocketAddr;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber;
@@ -22,8 +26,9 @@ pub async fn start_server(
 
     // ルーターを構築
     let app = Router::new()
-        // APIルート
+        // API routes
         .route("/api/spec", get(api::get_spec).put(api::update_spec))
+        // Visualization API routes
         .route("/api/workflows", get(api::get_workflows))
         .route(
             "/api/workflows/{workflow_id}",
@@ -32,7 +37,10 @@ pub async fn start_server(
                 .delete(api::delete_workflow),
         )
         .route("/api/graph/{workflow_id}", get(api::get_graph))
-        // 静的ファイル (CSS, JS) - distフォルダから
+        // Editor API routes
+        .route("/api/editor/operations", get(api::get_operations))
+        .route("/api/editor/validate", post(api::validate_arazzo))
+        // Static files (CSS, JS) - from dist folder
         .route("/assets/{*path}", get(serve_static))
         // ルートルートはindex.htmlを提供
         .route("/", get(serve_index))

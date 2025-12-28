@@ -34,9 +34,7 @@ describe('App', () => {
       { id: 'n1', label: 'Node 1', method: 'GET' },
       { id: 'n2', label: 'Node 2', method: 'POST' },
     ],
-    edges: [
-      { source: 'n1', target: 'n2', edge_type: 'Sequential', label: 'next' },
-    ],
+    edges: [{ source: 'n1', target: 'n2', edge_type: 'Sequential', label: 'next' }],
   };
 
   beforeEach(() => {

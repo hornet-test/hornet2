@@ -24,7 +24,9 @@ export function DetailsPanel({ nodeData }: DetailsPanelProps) {
               <div className="detail-item">
                 <div className="detail-label">HTTP Method</div>
                 <div className="detail-value">
-                  <span className={`http-method ${nodeData.method.toLowerCase()}`}>{nodeData.method}</span>
+                  <span className={`http-method ${nodeData.method.toLowerCase()}`}>
+                    {nodeData.method}
+                  </span>
                 </div>
               </div>
             )}
