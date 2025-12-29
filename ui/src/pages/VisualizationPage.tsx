@@ -38,7 +38,6 @@ export const VisualizationPage: React.FC = () => {
 
   // Removed fetchProjects and replaced with store usage is implicit by removing the definition
 
-
   const fetchWorkflows = useCallback(async () => {
     if (!project) return;
     try {
@@ -64,25 +63,29 @@ export const VisualizationPage: React.FC = () => {
     }
   }, [project]);
 
-  const fetchGraph = useCallback(async (workflowId: string) => {
-    if (!workflowId || !project) return;
-    try {
-      setStatus({ message: `Loading graph for ${workflowId}...`, type: 'info' });
-      const response = await fetch(`/api/projects/${project}/graph/${encodeURIComponent(workflowId)}`);
-      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      const data = (await response.json()) as GraphData;
-      setGraph(data);
-      setStatus({
-        message: `Rendered ${data.nodes.length} nodes and ${data.edges.length} edges`,
-        type: 'success',
-      });
-    } catch (error) {
-      setStatus({ message: `Error: ${(error as Error).message}`, type: 'error' });
-    }
-  }, [project]);
+  const fetchGraph = useCallback(
+    async (workflowId: string) => {
+      if (!workflowId || !project) return;
+      try {
+        setStatus({ message: `Loading graph for ${workflowId}...`, type: 'info' });
+        const response = await fetch(
+          `/api/projects/${project}/graph/${encodeURIComponent(workflowId)}`,
+        );
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const data = (await response.json()) as GraphData;
+        setGraph(data);
+        setStatus({
+          message: `Rendered ${data.nodes.length} nodes and ${data.edges.length} edges`,
+          type: 'success',
+        });
+      } catch (error) {
+        setStatus({ message: `Error: ${(error as Error).message}`, type: 'error' });
+      }
+    },
+    [project],
+  );
 
   // Removed fetchProjects effect
-
 
   useEffect(() => {
     if (project) {

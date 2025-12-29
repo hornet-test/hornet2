@@ -7,13 +7,13 @@ type PageType = 'visualization' | 'editor';
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<PageType>('visualization');
-  const { 
-    projects, 
-    currentProject, 
-    selectProject, 
-    loadProjects, 
+  const {
+    projects,
+    currentProject,
+    selectProject,
+    loadProjects,
     isLoading: isProjectLoading,
-    error: projectError 
+    error: projectError,
   } = useProjectStore();
 
   useEffect(() => {
@@ -29,18 +29,20 @@ export default function App() {
               <h1>Hornet2</h1>
               <p className="subtitle">Document-driven API testing tool</p>
             </div>
-            
+
             <div className="project-selector">
               <label htmlFor="project-select">Project:</label>
-              <select 
+              <select
                 id="project-select"
-                value={currentProject || ''} 
+                value={currentProject || ''}
                 onChange={(e) => selectProject(e.target.value)}
                 disabled={isProjectLoading}
               >
                 {!currentProject && <option value="">Select Project...</option>}
-                {projects.map(p => (
-                  <option key={p.name} value={p.name}>{p.title || p.name}</option>
+                {projects.map((p) => (
+                  <option key={p.name} value={p.name}>
+                    {p.title || p.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -65,10 +67,10 @@ export default function App() {
 
       <main className="app-main">
         {projectError && <div className="error-banner">{projectError}</div>}
-        
+
         {!currentProject ? (
           <div className="no-project">
-             {isProjectLoading ? "Loading projects..." : "Please select a project."}
+            {isProjectLoading ? 'Loading projects...' : 'Please select a project.'}
           </div>
         ) : (
           <>
