@@ -52,6 +52,13 @@ export interface ProjectInfo {
   openapi_files: string[];
 }
 
+export interface WorkflowInfo {
+  workflow_id: string;
+  title?: string;
+  description?: string;
+  steps: number;
+}
+
 // Arazzo Spec types (simplified for editor)
 export interface ArazzoWorkflow {
   workflowId: string;

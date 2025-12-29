@@ -87,8 +87,28 @@ impl ProjectCache {
 
     /// プロジェクトを個別に再読み込み（ワークフロー作成/更新後）
     pub fn reload_project(&mut self, name: &str, root_dir: &Path) -> Result<()> {
-        let project_dir = root_dir.join(name);
         let scanner = ProjectScanner::new(root_dir);
+
+        // Check if this is single-project mode (root dir contains arazzo.yaml)
+        let root_arazzo = root_dir.join("arazzo.yaml");
+        let project_dir = if root_arazzo.exists() {
+            // Single-project mode: use root_dir if the project name matches
+            let root_name = root_dir
+                .canonicalize()
+                .ok()
+                .and_then(|p| p.file_name().map(|n| n.to_string_lossy().to_string()))
+                .unwrap_or_else(|| "default".to_string());
+
+            if name == root_name {
+                root_dir.to_path_buf()
+            } else {
+                root_dir.join(name)
+            }
+        } else {
+            // Multi-project mode: project is in subdirectory
+            root_dir.join(name)
+        };
+
         let meta = scanner.load_project_metadata(&project_dir)?;
         let project_data = ProjectData::from_metadata(meta)?;
 
