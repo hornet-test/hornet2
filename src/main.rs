@@ -1,6 +1,6 @@
 use clap::Parser;
 use hornet2::{
-    cli::{Cli, Commands},
+    cli::{Cli, Commands, ExportFormat},
     commands, Result,
 };
 
@@ -69,6 +69,15 @@ async fn main() -> Result<()> {
                 duration: duration.as_deref(),
                 iterations,
             })?;
+        }
+        Commands::ExportOpenapi { format, output } => {
+            commands::execute_export_openapi(
+                match format {
+                    ExportFormat::Yaml => "yaml",
+                    ExportFormat::Json => "json",
+                },
+                output.as_deref(),
+            )?;
         }
     }
 

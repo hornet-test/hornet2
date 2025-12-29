@@ -1160,3 +1160,25 @@ pub async fn get_project_graph(
 
     Ok(Json(json))
 }
+
+// ============================================================================
+// OpenAPI Specification Endpoint
+// ============================================================================
+
+/// GET /api/openapi.json - Get Hornet2 API specification in OpenAPI format
+pub async fn get_openapi_spec() -> ApiResult<Json<serde_json::Value>> {
+    // Embed the YAML file at compile time
+    const OPENAPI_YAML: &str = include_str!("../../openapi.yaml");
+
+    // Parse YAML to JSON
+    let spec: serde_json::Value = serde_yaml::from_str(OPENAPI_YAML).map_err(|e| {
+        ProblemDetails::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "openapi-parse-failed",
+            "Failed to Parse OpenAPI Specification",
+            format!("Failed to parse embedded OpenAPI YAML: {}", e),
+        )
+    })?;
+
+    Ok(Json(spec))
+}

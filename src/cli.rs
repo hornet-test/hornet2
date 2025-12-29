@@ -133,6 +133,17 @@ pub enum Commands {
         #[arg(long)]
         iterations: Option<u32>,
     },
+
+    /// Export Hornet2 API specification in OpenAPI format
+    ExportOpenapi {
+        /// Output format (json or yaml)
+        #[arg(short, long, default_value = "yaml")]
+        format: ExportFormat,
+
+        /// Output file (stdout if not specified)
+        #[arg(short = 'O', long)]
+        output: Option<PathBuf>,
+    },
 }
 
 #[derive(Clone, ValueEnum)]
@@ -143,4 +154,12 @@ pub enum OutputFormat {
     Json,
     /// Mermaid diagram format
     Mermaid,
+}
+
+#[derive(Clone, ValueEnum)]
+pub enum ExportFormat {
+    /// YAML format
+    Yaml,
+    /// JSON format
+    Json,
 }

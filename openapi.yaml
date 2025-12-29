@@ -1,0 +1,998 @@
+openapi: 3.0.3
+info:
+  title: Hornet2 API
+  description: |
+    Document-driven API testing tool - REST API for managing Arazzo workflows and OpenAPI specifications.
+
+    This API follows RESTful principles and uses RFC 9457 Problem Details for error responses.
+    All error responses use the `application/problem+json` media type.
+  version: 0.1.0
+  contact:
+    name: Hornet2 Project
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:3000
+    description: Development server
+  - url: /
+    description: Current server (relative)
+
+tags:
+  - name: Projects
+    description: Multi-project management endpoints
+  - name: Workflows
+    description: Workflow CRUD operations
+  - name: Graphs
+    description: Workflow visualization
+  - name: Editor
+    description: Editor support endpoints
+  - name: Validation
+    description: Spec validation endpoints
+
+paths:
+  /api/projects:
+    get:
+      summary: List all projects
+      description: Returns a list of all available Arazzo projects in the root directory
+      operationId: listProjects
+      tags: [Projects]
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectsResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/projects/{project_name}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectName'
+    get:
+      summary: Get project details
+      description: Get detailed information about a specific project
+      operationId: getProject
+      tags: [Projects]
+      responses:
+        '200':
+          description: Project details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/projects/{project_name}/arazzo:
+    parameters:
+      - $ref: '#/components/parameters/ProjectName'
+    get:
+      summary: Get Arazzo specification
+      description: Retrieve the complete Arazzo specification for a project
+      operationId: getProjectArazzo
+      tags: [Projects]
+      responses:
+        '200':
+          description: Arazzo specification
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArazzoSpec'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      summary: Update Arazzo specification
+      description: Update the entire Arazzo specification for a project
+      operationId: updateProjectArazzo
+      tags: [Projects]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArazzoSpec'
+      responses:
+        '200':
+          description: Arazzo specification updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArazzoSpec'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/projects/{project_name}/workflows:
+    parameters:
+      - $ref: '#/components/parameters/ProjectName'
+    get:
+      summary: List workflows in project
+      description: Get a list of all workflows defined in the project's Arazzo specification
+      operationId: getProjectWorkflows
+      tags: [Workflows]
+      responses:
+        '200':
+          description: Workflow list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      summary: Create new workflow
+      description: Add a new workflow to the project's Arazzo specification
+      operationId: createProjectWorkflow
+      tags: [Workflows]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkflowRequest'
+      responses:
+        '201':
+          description: Workflow created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workflow'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Workflow with same ID already exists
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+              example:
+                type: "https://hornet2.dev/problems/workflow-exists"
+                title: "Resource Already Exists"
+                status: 409
+                detail: "Workflow with ID 'user-login-flow' already exists"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/projects/{project_name}/workflows/{workflow_id}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectName'
+      - $ref: '#/components/parameters/WorkflowId'
+    get:
+      summary: Get specific workflow
+      description: Retrieve a specific workflow by its ID
+      operationId: getProjectWorkflow
+      tags: [Workflows]
+      responses:
+        '200':
+          description: Workflow details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workflow'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      summary: Update workflow
+      description: Update an existing workflow in the Arazzo specification
+      operationId: updateProjectWorkflow
+      tags: [Workflows]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Workflow'
+      responses:
+        '200':
+          description: Workflow updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workflow'
+        '400':
+          description: Invalid request (e.g., workflow ID mismatch)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+              example:
+                type: "https://hornet2.dev/problems/workflow-id-mismatch"
+                title: "Invalid Request"
+                status: 400
+                detail: "Workflow ID in path (flow1) does not match workflow ID in body (flow2)"
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      summary: Delete workflow
+      description: Remove a workflow from the Arazzo specification
+      operationId: deleteProjectWorkflow
+      tags: [Workflows]
+      responses:
+        '204':
+          description: Workflow deleted successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/projects/{project_name}/graph/{workflow_id}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectName'
+      - $ref: '#/components/parameters/WorkflowId'
+    get:
+      summary: Get workflow graph
+      description: Generate a graph visualization of the workflow in JSON format
+      operationId: getProjectGraph
+      tags: [Graphs]
+      responses:
+        '200':
+          description: Workflow graph data
+          content:
+            application/json:
+              schema:
+                type: object
+                description: Graph data in JSON format suitable for visualization
+                properties:
+                  nodes:
+                    type: array
+                    items:
+                      type: object
+                  edges:
+                    type: array
+                    items:
+                      type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          description: Graph build or export failed
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+              examples:
+                graphBuildFailed:
+                  summary: Graph build failed
+                  value:
+                    type: "https://hornet2.dev/problems/graph-build-failed"
+                    title: "Graph Build Failed"
+                    status: 500
+                    detail: "Failed to build workflow graph: circular dependency detected"
+                graphExportFailed:
+                  summary: Graph export failed
+                  value:
+                    type: "https://hornet2.dev/problems/graph-export-failed"
+                    title: "Graph Export Failed"
+                    status: 500
+                    detail: "Failed to export graph to JSON: serialization error"
+
+  /api/projects/{project_name}/operations:
+    parameters:
+      - $ref: '#/components/parameters/ProjectName'
+    get:
+      summary: Get OpenAPI operations
+      description: List all available operations from the project's OpenAPI specifications
+      operationId: getProjectOperations
+      tags: [Editor]
+      responses:
+        '200':
+          description: List of operations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OperationsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/validate:
+    post:
+      summary: Validate Arazzo YAML
+      description: Validate Arazzo specification YAML for syntax and semantic errors
+      operationId: validateArazzo
+      tags: [Validation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidateRequest'
+      responses:
+        '200':
+          description: Validation result (may contain errors even if HTTP 200)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidateResponse'
+
+  /api/openapi.json:
+    get:
+      summary: Get Hornet2 API specification
+      description: Returns this OpenAPI specification in JSON format
+      operationId: getOpenapiSpec
+      tags: [Editor]
+      responses:
+        '200':
+          description: OpenAPI specification
+          content:
+            application/json:
+              schema:
+                type: object
+                description: OpenAPI 3.0.3 specification document
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  parameters:
+    ProjectName:
+      name: project_name
+      in: path
+      required: true
+      description: Name of the project (must be alphanumeric, no path separators)
+      schema:
+        type: string
+        pattern: '^[a-zA-Z0-9_-]+$'
+      example: "project1"
+
+    WorkflowId:
+      name: workflow_id
+      in: path
+      required: true
+      description: Workflow identifier
+      schema:
+        type: string
+      example: "user-registration-flow"
+
+  schemas:
+    ProjectsResponse:
+      type: object
+      required: [projects]
+      properties:
+        projects:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectInfo'
+
+    ProjectInfo:
+      type: object
+      required: [name, title, workflow_count, arazzo_path, openapi_files]
+      properties:
+        name:
+          type: string
+          description: Unique project name (directory name)
+          example: "project1"
+        title:
+          type: string
+          description: Human-readable project title from Arazzo info.title
+          example: "User Management API"
+        description:
+          type: string
+          nullable: true
+          description: Optional project description from Arazzo info.description
+          example: "API for managing user accounts and authentication"
+        workflow_count:
+          type: integer
+          description: Number of workflows in project
+          example: 3
+        arazzo_path:
+          type: string
+          description: Relative path to Arazzo file
+          example: "project1/arazzo.yaml"
+        openapi_files:
+          type: array
+          items:
+            type: string
+          description: List of OpenAPI file paths in project
+          example: ["project1/openapi.yaml", "project1/openapi-v2.yaml"]
+
+    ProjectDetail:
+      type: object
+      required: [name, title, workflow_count, openapi_files]
+      properties:
+        name:
+          type: string
+          description: Unique project name
+          example: "project1"
+        title:
+          type: string
+          description: Human-readable project title
+          example: "User Management API"
+        description:
+          type: string
+          nullable: true
+          description: Optional project description
+        workflow_count:
+          type: integer
+          description: Number of workflows in project
+          example: 3
+        openapi_files:
+          type: array
+          items:
+            type: string
+          description: List of OpenAPI file paths
+          example: ["project1/openapi.yaml"]
+
+    WorkflowsResponse:
+      type: object
+      required: [workflows]
+      properties:
+        workflows:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowInfo'
+
+    WorkflowInfo:
+      type: object
+      required: [workflow_id, steps]
+      properties:
+        workflow_id:
+          type: string
+          description: Unique workflow identifier
+          example: "user-registration-flow"
+        title:
+          type: string
+          nullable: true
+          description: Workflow title (from summary field)
+          example: "User Registration Workflow"
+        description:
+          type: string
+          nullable: true
+          description: Detailed workflow description
+          example: "Complete user registration process including email verification"
+        steps:
+          type: integer
+          description: Number of steps in workflow
+          example: 5
+
+    CreateWorkflowRequest:
+      type: object
+      required: [workflow]
+      properties:
+        workflow:
+          $ref: '#/components/schemas/Workflow'
+
+    Workflow:
+      type: object
+      required: [workflowId, steps]
+      properties:
+        workflowId:
+          type: string
+          description: Unique workflow identifier (camelCase)
+          example: "userRegistrationFlow"
+        summary:
+          type: string
+          nullable: true
+          description: Short summary of workflow purpose
+          example: "User registration process"
+        description:
+          type: string
+          nullable: true
+          description: Detailed description of the workflow
+        inputs:
+          type: object
+          nullable: true
+          description: Workflow input parameters schema
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/Step'
+        successCriteria:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/SuccessCriteria'
+        outputs:
+          type: object
+          nullable: true
+          description: Workflow output values
+        parameters:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/Parameter'
+
+    Step:
+      type: object
+      required: [stepId]
+      properties:
+        stepId:
+          type: string
+          description: Unique step identifier within workflow
+          example: "createUser"
+        description:
+          type: string
+          nullable: true
+          description: Step description
+        operationId:
+          type: string
+          nullable: true
+          description: Reference to OpenAPI operationId
+          example: "createUser"
+        operationPath:
+          type: string
+          nullable: true
+          description: Direct reference to operation path
+        workflowId:
+          type: string
+          nullable: true
+          description: Reference to another workflow (for workflow composition)
+        parameters:
+          type: array
+          items:
+            $ref: '#/components/schemas/Parameter'
+        requestBody:
+          $ref: '#/components/schemas/RequestBody'
+          nullable: true
+        successCriteria:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/SuccessCriteria'
+        onSuccess:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/SuccessAction'
+        onFailure:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/FailureAction'
+        outputs:
+          type: object
+          nullable: true
+
+    Parameter:
+      type: object
+      required: [name, in]
+      properties:
+        name:
+          type: string
+          example: "userId"
+        in:
+          type: string
+          enum: [path, query, header, cookie]
+          example: "path"
+        value:
+          description: Parameter value (can be literal or runtime expression)
+          example: "$workflows.previousStep.outputs.userId"
+
+    RequestBody:
+      type: object
+      properties:
+        contentType:
+          type: string
+          example: "application/json"
+        payload:
+          description: Request body content
+
+    SuccessCriteria:
+      type: object
+      required: [condition]
+      properties:
+        condition:
+          type: string
+          description: Boolean expression to evaluate
+          example: "$statusCode == 200"
+        context:
+          type: string
+          nullable: true
+
+    SuccessAction:
+      type: object
+      required: [name, type]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [end, goto]
+        stepId:
+          type: string
+          nullable: true
+        workflowId:
+          type: string
+          nullable: true
+        criteria:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/Criterion'
+
+    FailureAction:
+      type: object
+      required: [name, type]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [end, goto, retry]
+        stepId:
+          type: string
+          nullable: true
+        workflowId:
+          type: string
+          nullable: true
+        retryAfter:
+          type: number
+          nullable: true
+        retryLimit:
+          type: integer
+          nullable: true
+        criteria:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/Criterion'
+
+    Criterion:
+      type: object
+      required: [condition]
+      properties:
+        condition:
+          type: string
+        context:
+          type: string
+          nullable: true
+
+    ArazzoSpec:
+      type: object
+      required: [arazzo, info, sourceDescriptions, workflows]
+      properties:
+        arazzo:
+          type: string
+          description: Arazzo specification version
+          example: "1.0.0"
+        info:
+          $ref: '#/components/schemas/Info'
+        sourceDescriptions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceDescription'
+        workflows:
+          type: array
+          items:
+            $ref: '#/components/schemas/Workflow'
+        components:
+          $ref: '#/components/schemas/Components'
+          nullable: true
+
+    Info:
+      type: object
+      required: [title, version]
+      properties:
+        title:
+          type: string
+          example: "User Management API"
+        version:
+          type: string
+          example: "1.0.0"
+        description:
+          type: string
+          nullable: true
+        summary:
+          type: string
+          nullable: true
+
+    SourceDescription:
+      type: object
+      required: [name, url, type]
+      properties:
+        name:
+          type: string
+          example: "userapi"
+        url:
+          type: string
+          example: "openapi.yaml"
+        type:
+          type: string
+          enum: [openapi, arazzo]
+
+    Components:
+      type: object
+      properties:
+        inputs:
+          type: object
+          nullable: true
+        parameters:
+          type: object
+          nullable: true
+        successActions:
+          type: object
+          nullable: true
+        failureActions:
+          type: object
+          nullable: true
+
+    OperationsResponse:
+      type: object
+      required: [operations]
+      properties:
+        operations:
+          type: array
+          items:
+            $ref: '#/components/schemas/OperationInfo'
+
+    OperationInfo:
+      type: object
+      required: [operation_id, method, path]
+      properties:
+        operation_id:
+          type: string
+          description: Unique operation identifier
+          example: "createUser"
+        method:
+          type: string
+          enum: [GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS]
+          example: "POST"
+        path:
+          type: string
+          description: API endpoint path
+          example: "/users"
+        summary:
+          type: string
+          nullable: true
+          description: Operation summary
+          example: "Create a new user"
+        description:
+          type: string
+          nullable: true
+          description: Detailed operation description
+        parameters:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParameterInfo'
+        request_body:
+          $ref: '#/components/schemas/RequestBodyInfo'
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+          example: ["Users"]
+        response_codes:
+          type: array
+          items:
+            type: string
+          description: List of possible response status codes
+          example: ["200", "400", "404"]
+        response_schema:
+          $ref: '#/components/schemas/ResponseSchemaInfo'
+          nullable: true
+
+    ParameterInfo:
+      type: object
+      required: [name, location, required]
+      properties:
+        name:
+          type: string
+          example: "userId"
+        location:
+          type: string
+          enum: [path, query, header, cookie]
+          example: "path"
+        required:
+          type: boolean
+          example: true
+        schema_type:
+          type: string
+          nullable: true
+          description: Parameter type (string, integer, etc.)
+          example: "string"
+        description:
+          type: string
+          nullable: true
+          example: "Unique user identifier"
+
+    RequestBodyInfo:
+      type: object
+      required: [required]
+      properties:
+        required:
+          type: boolean
+          example: true
+        content_type:
+          type: string
+          example: "application/json"
+        schema_ref:
+          type: string
+          nullable: true
+          description: Reference to schema
+          example: "#/components/schemas/User"
+
+    ResponseSchemaInfo:
+      type: object
+      properties:
+        schema_ref:
+          type: string
+          nullable: true
+          description: Reference to response schema
+          example: "#/components/schemas/User"
+        description:
+          type: string
+          nullable: true
+
+    ValidateRequest:
+      type: object
+      required: [yaml]
+      properties:
+        yaml:
+          type: string
+          description: Arazzo YAML content to validate
+          example: |
+            arazzo: 1.0.0
+            info:
+              title: Test Workflow
+              version: 1.0.0
+            sourceDescriptions: []
+            workflows:
+              - workflowId: test
+                steps: []
+
+    ValidateResponse:
+      type: object
+      required: [valid, errors]
+      properties:
+        valid:
+          type: boolean
+          description: Whether the YAML is valid
+          example: true
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationErrorInfo'
+
+    ValidationErrorInfo:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          description: Error message
+          example: "Missing required field 'workflowId'"
+        line:
+          type: integer
+          nullable: true
+          description: Line number where error occurred
+          example: 10
+        column:
+          type: integer
+          nullable: true
+          description: Column number where error occurred
+          example: 5
+
+    ProblemDetails:
+      type: object
+      required: [type, title, status, detail]
+      description: RFC 9457 Problem Details for HTTP APIs
+      externalDocs:
+        description: RFC 9457 Specification
+        url: https://datatracker.ietf.org/doc/html/rfc9457
+      properties:
+        type:
+          type: string
+          format: uri
+          description: URI reference identifying the problem type
+          example: "https://hornet2.dev/problems/project-not-found"
+        title:
+          type: string
+          description: Short, human-readable summary of the problem type
+          example: "Project Not Found"
+        status:
+          type: integer
+          description: HTTP status code generated by the origin server
+          minimum: 100
+          maximum: 599
+          example: 404
+        detail:
+          type: string
+          description: Human-readable explanation specific to this occurrence
+          example: "Project 'example-project' not found: no such directory"
+        instance:
+          type: string
+          format: uri
+          nullable: true
+          description: URI reference identifying the specific occurrence of the problem
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters or body
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          examples:
+            invalidProjectName:
+              summary: Invalid project name
+              value:
+                type: "https://hornet2.dev/problems/invalid-project-name"
+                title: "Invalid Request"
+                status: 400
+                detail: "Project name contains invalid characters (..)"
+            workflowIdMismatch:
+              summary: Workflow ID mismatch
+              value:
+                type: "https://hornet2.dev/problems/workflow-id-mismatch"
+                title: "Invalid Request"
+                status: 400
+                detail: "Workflow ID in path (flow1) does not match workflow ID in body (flow2)"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          examples:
+            projectNotFound:
+              summary: Project not found
+              value:
+                type: "https://hornet2.dev/problems/project-not-found"
+                title: "Project Not Found"
+                status: 404
+                detail: "Project 'example' not found"
+            workflowNotFound:
+              summary: Workflow not found
+              value:
+                type: "https://hornet2.dev/problems/workflow-not-found"
+                title: "Resource Not Found"
+                status: 404
+                detail: "Workflow 'user-login-flow' not found"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+          examples:
+            cacheLockFailed:
+              summary: Cache lock failed
+              value:
+                type: "https://hornet2.dev/problems/cache-lock-failed"
+                title: "Internal Server Error"
+                status: 500
+                detail: "Failed to acquire project cache lock"
+            loadFailed:
+              summary: Load failed
+              value:
+                type: "https://hornet2.dev/problems/load-failed"
+                title: "Failed to Load Resource"
+                status: 500
+                detail: "Failed to load Arazzo specification: IO error"
+
+  securitySchemes: {}
+
+security: []
