@@ -10,6 +10,8 @@ YELLOW := \033[0;33m
 NC := \033[0m # No Color
 
 # テストファイル（必要に応じて変更）
+TEST_ROOT_DIR := tests/fixtures/multi_project
+# Legacy single-file mode (for other commands)
 TEST_ARAZZO := tests/fixtures/arazzo.yaml
 TEST_OPENAPI := tests/fixtures/openapi.yaml
 
@@ -66,11 +68,11 @@ dev: ## 開発モード: CLIサーバーとUIを同時起動（Ctrl+Cで両方�
 	@echo ""
 	@trap 'kill 0' EXIT; \
 		(cd ui && pnpm dev) & \
-		cargo run -- serve --arazzo $(TEST_ARAZZO) --openapi $(TEST_OPENAPI) --port 3000
+		cargo run -- serve --root-dir $(TEST_ROOT_DIR) --port 3000
 
 cli-dev: ## CLIサーバーのみ起動
 	@echo "$(BLUE)Starting CLI server on http://localhost:3000$(NC)"
-	@cargo run -- serve --arazzo $(TEST_ARAZZO) --openapi $(TEST_OPENAPI) --port 3000
+	@cargo run -- serve --root-dir $(TEST_ROOT_DIR) --port 3000
 
 ui-dev: ## UI開発サーバーのみ起動
 	@echo "$(BLUE)Starting UI dev server on http://localhost:5173$(NC)"
@@ -85,7 +87,7 @@ cli-test: ## Rustのテストを実行
 
 ui-test: ## UIのテストを実行
 	@echo "$(BLUE)Running UI tests...$(NC)"
-	@cd ui && pnpm test -- --run
+	@cd ui && pnpm test:run
 
 ui-test-watch: ## UIのテストをwatchモードで実行
 	@cd ui && pnpm test

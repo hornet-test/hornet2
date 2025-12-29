@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "test": "vitest",
+    "test:run": "vitest run",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
