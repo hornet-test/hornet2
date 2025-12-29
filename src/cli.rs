@@ -144,6 +144,17 @@ pub enum Commands {
         #[arg(short = 'O', long)]
         output: Option<PathBuf>,
     },
+
+    /// Export Hornet2 Arazzo specification
+    ExportArazzo {
+        /// Output format (json or yaml)
+        #[arg(short, long, default_value = "yaml")]
+        format: ExportFormat,
+
+        /// Output file (stdout if not specified)
+        #[arg(short = 'O', long)]
+        output: Option<PathBuf>,
+    },
 }
 
 #[derive(Clone, ValueEnum)]

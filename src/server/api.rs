@@ -1182,3 +1182,25 @@ pub async fn get_openapi_spec() -> ApiResult<Json<serde_json::Value>> {
 
     Ok(Json(spec))
 }
+
+// ============================================================================
+// Arazzo Specification Endpoint
+// ============================================================================
+
+/// GET /api/arazzo.json - Get Hornet2 Arazzo specification
+pub async fn get_arazzo_spec() -> ApiResult<Json<serde_json::Value>> {
+    // Embed the YAML file at compile time
+    const ARAZZO_YAML: &str = include_str!("../../arazzo.yaml");
+
+    // Parse YAML to JSON
+    let spec: serde_json::Value = serde_yaml::from_str(ARAZZO_YAML).map_err(|e| {
+        ProblemDetails::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "arazzo-parse-failed",
+            "Failed to Parse Arazzo Specification",
+            format!("Failed to parse embedded Arazzo YAML: {}", e),
+        )
+    })?;
+
+    Ok(Json(spec))
+}

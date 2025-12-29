@@ -47,6 +47,7 @@ pub async fn start_server(addr: SocketAddr, root_dir: PathBuf) -> crate::Result<
         )
         .route("/api/validate", axum::routing::post(api::validate_arazzo))
         .route("/api/openapi.json", get(api::get_openapi_spec))
+        .route("/api/arazzo.json", get(api::get_arazzo_spec))
         // Static files (CSS, JS) - from dist folder
         .route("/assets/{*path}", get(serve_static))
         // ルートルートはindex.htmlを提供
@@ -173,6 +174,7 @@ cargo run -- serve --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/
             <li><code>DELETE /api/projects/{project_name}/workflows/{id}</code> - Delete specific workflow</li>
             <li><code>GET /api/projects/{project_name}/graph/{id}</code> - Get workflow graph visualization</li>
             <li><code>GET /api/openapi.json</code> - Get API specification (OpenAPI 3.0.3)</li>
+            <li><code>GET /api/arazzo.json</code> - Get Arazzo workflow specification (Arazzo 1.0.0)</li>
         </ul>
     </div>
 </body>

@@ -1,0 +1,383 @@
+arazzo: 1.0.0
+info:
+  title: Hornet2 API Workflows
+  description: |
+    Typical workflow patterns for using the Hornet2 API.
+    These workflows demonstrate how to interact with the Hornet2 API for common tasks:
+    - Discovering and exploring projects
+    - Managing workflow lifecycle (CRUD operations)
+    - Visualizing workflows as graphs
+    - Managing Arazzo specifications
+  version: 1.0.0
+
+sourceDescriptions:
+  - name: hornet2API
+    url: ./openapi.yaml
+    type: openapi
+
+workflows:
+  - workflowId: project-discovery
+    summary: Discover and explore projects
+    description: |
+      This workflow demonstrates basic project exploration:
+      1. List all available projects
+      2. Get detailed information about a specific project
+      3. List workflows in that project
+    steps:
+      - stepId: listProjects
+        description: Get list of all available projects
+        operationId: listProjects
+        successCriteria:
+          - context: $statusCode
+            condition: ==
+            value: 200
+        outputs:
+          projects: $response.body.projects
+          firstProjectName: $response.body.projects[0].name
+
+      - stepId: getProject
+        description: Get details of the first project
+        operationId: getProject
+        parameters:
+          - name: project_name
+            in: path
+            value: $steps.listProjects.outputs.firstProjectName
+        successCriteria:
+          - context: $statusCode
+            condition: ==
+            value: 200
+        outputs:
+          projectInfo: $response.body
+
+      - stepId: getWorkflows
+        description: List workflows in the project
+        operationId: getProjectWorkflows
+        parameters:
+          - name: project_name
+            in: path
+            value: $steps.listProjects.outputs.firstProjectName
+        successCriteria:
+          - context: $statusCode
+            condition: ==
+            value: 200
+        outputs:
+          workflows: $response.body.workflows
+
+    outputs:
+      discoveredProject: $steps.getProject.outputs.projectInfo
+      availableWorkflows: $steps.getWorkflows.outputs.workflows
+
+  - workflowId: workflow-crud-lifecycle
+    summary: Complete workflow CRUD lifecycle
+    description: |
+      This workflow demonstrates the complete lifecycle of workflow management:
+      1. Get available OpenAPI operations
+      2. Create a new workflow
+      3. Retrieve the created workflow
+      4. Update the workflow
+      5. Verify the update
+      6. Delete the workflow
+    inputs:
+      type: object
+      properties:
+        projectName:
+          type: string
+          default: project1
+        workflowId:
+          type: string
+          default: test-workflow
+        workflowSummary:
+          type: string
+          default: Test workflow for demonstration
+    steps:
+      - stepId: getOperations
+        description: Get available OpenAPI operations for the project
+        operationId: getProjectOperations
+        parameters:
+          - name: project_name
+            in: path
+            value: $inputs.projectName
+        successCriteria:
+          - context: $statusCode
+            condition: ==
+            value: 200
+        outputs:
+          operations: $response.body.operations
+
+      - stepId: createWorkflow
+        description: Create a new workflow
+        operationId: createProjectWorkflow
+        parameters:
+          - name: project_name
+            in: path
+            value: $inputs.projectName
+        requestBody:
+          contentType: application/json
+          payload:
+            workflowId: $inputs.workflowId
+            summary: $inputs.workflowSummary
+            steps:
+              - stepId: example-step
+                operationId: getPetById
+                parameters:
+                  - name: petId
+                    in: path
+                    value: 1
+        successCriteria:
+          - context: $statusCode
+            condition: ==
+            value: 201
+        outputs:
+          createdWorkflow: $response.body
+
+      - stepId: getCreatedWorkflow
+        description: Retrieve the created workflow
+        operationId: getProjectWorkflow
+        parameters:
+          - name: project_name
+            in: path
+            value: $inputs.projectName
+          - name: workflow_id
+            in: path
+            value: $inputs.workflowId
+        successCriteria:
+          - context: $statusCode
+            condition: ==
+            value: 200
+          - context: $response.body.workflowId
+            condition: ==
+            value: $inputs.workflowId
+        outputs:
+          retrievedWorkflow: $response.body
+
+      - stepId: updateWorkflow
+        description: Update the workflow summary
+        operationId: updateProjectWorkflow
+        parameters:
+          - name: project_name
+            in: path
+            value: $inputs.projectName
+          - name: workflow_id
+            in: path
+            value: $inputs.workflowId
+        requestBody:
+          contentType: application/json
+          payload:
+            workflowId: $inputs.workflowId
+            summary: Updated workflow summary
+            steps:
+              - stepId: example-step
+                operationId: getPetById
+                parameters:
+                  - name: petId
+                    in: path
+                    value: 2
+        successCriteria:
+          - context: $statusCode
+            condition: ==
+            value: 200
+        outputs:
+          updatedWorkflow: $response.body
+
+      - stepId: verifyUpdate
+        description: Verify the workflow was updated
+        operationId: getProjectWorkflow
+        parameters:
+          - name: project_name
+            in: path
+            value: $inputs.projectName
+          - name: workflow_id
+            in: path
+            value: $inputs.workflowId
+        successCriteria:
+          - context: $statusCode
+            condition: ==
+            value: 200
+          - context: $response.body.summary
+            condition: ==
+            value: Updated workflow summary
+        outputs:
+          verifiedWorkflow: $response.body
+
+      - stepId: deleteWorkflow
+        description: Delete the workflow
+        operationId: deleteProjectWorkflow
+        parameters:
+          - name: project_name
+            in: path
+            value: $inputs.projectName
+          - name: workflow_id
+            in: path
+            value: $inputs.workflowId
+        successCriteria:
+          - context: $statusCode
+            condition: ==
+            value: 204
+
+    outputs:
+      finalCreatedWorkflow: $steps.createWorkflow.outputs.createdWorkflow
+      finalUpdatedWorkflow: $steps.updateWorkflow.outputs.updatedWorkflow
+
+  - workflowId: workflow-visualization
+    summary: Visualize workflow as graph
+    description: |
+      This workflow demonstrates how to visualize a workflow:
+      1. List available workflows in a project
+      2. Get details of a specific workflow
+      3. Get the graph representation of the workflow
+    inputs:
+      type: object
+      properties:
+        projectName:
+          type: string
+          default: project1
+    steps:
+      - stepId: listWorkflows
+        description: List all workflows in the project
+        operationId: getProjectWorkflows
+        parameters:
+          - name: project_name
+            in: path
+            value: $inputs.projectName
+        successCriteria:
+          - context: $statusCode
+            condition: ==
+            value: 200
+        outputs:
+          workflows: $response.body.workflows
+          firstWorkflowId: $response.body.workflows[0].workflow_id
+
+      - stepId: getWorkflowDetails
+        description: Get details of the first workflow
+        operationId: getProjectWorkflow
+        parameters:
+          - name: project_name
+            in: path
+            value: $inputs.projectName
+          - name: workflow_id
+            in: path
+            value: $steps.listWorkflows.outputs.firstWorkflowId
+        successCriteria:
+          - context: $statusCode
+            condition: ==
+            value: 200
+        outputs:
+          workflowDetails: $response.body
+
+      - stepId: getGraph
+        description: Get graph representation of the workflow
+        operationId: getProjectGraph
+        parameters:
+          - name: project_name
+            in: path
+            value: $inputs.projectName
+          - name: workflow_id
+            in: path
+            value: $steps.listWorkflows.outputs.firstWorkflowId
+        successCriteria:
+          - context: $statusCode
+            condition: ==
+            value: 200
+        outputs:
+          graphData: $response.body
+
+    outputs:
+      workflowDetails: $steps.getWorkflowDetails.outputs.workflowDetails
+      graphVisualization: $steps.getGraph.outputs.graphData
+
+  - workflowId: arazzo-management
+    summary: Manage Arazzo specifications
+    description: |
+      This workflow demonstrates Arazzo specification management:
+      1. Get the current Arazzo specification
+      2. Update the Arazzo specification
+      3. Verify the update
+      4. Validate the Arazzo specification
+    inputs:
+      type: object
+      properties:
+        projectName:
+          type: string
+          default: project1
+    steps:
+      - stepId: getArazzo
+        description: Get current Arazzo specification
+        operationId: getProjectArazzo
+        parameters:
+          - name: project_name
+            in: path
+            value: $inputs.projectName
+        successCriteria:
+          - context: $statusCode
+            condition: ==
+            value: 200
+        outputs:
+          originalArazzo: $response.body
+
+      - stepId: updateArazzo
+        description: Update Arazzo specification with a new workflow
+        operationId: updateProjectArazzo
+        parameters:
+          - name: project_name
+            in: path
+            value: $inputs.projectName
+        requestBody:
+          contentType: application/json
+          payload:
+            arazzo: 1.0.0
+            info:
+              title: Updated Project Arazzo
+              version: 1.0.1
+            sourceDescriptions:
+              - name: petstore
+                url: openapi.yaml
+                type: openapi
+            workflows:
+              - workflowId: updated-workflow
+                summary: Updated workflow
+                steps:
+                  - stepId: step1
+                    operationId: getPetById
+                    parameters:
+                      - name: petId
+                        in: path
+                        value: 1
+        successCriteria:
+          - context: $statusCode
+            condition: ==
+            value: 200
+        outputs:
+          updateResult: $response.body
+
+      - stepId: verifyArazzoUpdate
+        description: Verify the Arazzo specification was updated
+        operationId: getProjectArazzo
+        parameters:
+          - name: project_name
+            in: path
+            value: $inputs.projectName
+        successCriteria:
+          - context: $statusCode
+            condition: ==
+            value: 200
+        outputs:
+          updatedArazzo: $response.body
+
+      - stepId: validateArazzo
+        description: Validate the updated Arazzo specification
+        operationId: validateArazzo
+        requestBody:
+          contentType: application/json
+          payload:
+            arazzo_content: $steps.verifyArazzoUpdate.outputs.updatedArazzo
+        successCriteria:
+          - context: $statusCode
+            condition: ==
+            value: 200
+        outputs:
+          validationResult: $response.body
+
+    outputs:
+      originalSpec: $steps.getArazzo.outputs.originalArazzo
+      updatedSpec: $steps.verifyArazzoUpdate.outputs.updatedArazzo
+      validation: $steps.validateArazzo.outputs.validationResult

@@ -79,6 +79,15 @@ async fn main() -> Result<()> {
                 output.as_deref(),
             )?;
         }
+        Commands::ExportArazzo { format, output } => {
+            commands::execute_export_arazzo(
+                match format {
+                    ExportFormat::Yaml => "yaml",
+                    ExportFormat::Json => "json",
+                },
+                output.as_deref(),
+            )?;
+        }
     }
 
     Ok(())
