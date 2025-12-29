@@ -30,6 +30,22 @@ impl ProjectScanner {
     pub fn scan_projects(&self) -> Result<Vec<ProjectMetadata>> {
         let mut projects = Vec::new();
 
+        // Check if the root directory itself contains arazzo.yaml (single-project mode)
+        let root_arazzo = self.root_dir.join("arazzo.yaml");
+        if root_arazzo.exists() {
+            match self.load_project_metadata(&self.root_dir) {
+                Ok(meta) => projects.push(meta),
+                Err(e) => {
+                    eprintln!(
+                        "Warning: Failed to load project at root {}: {}",
+                        self.root_dir.display(),
+                        e
+                    );
+                }
+            }
+        }
+
+        // Scan subdirectories for additional projects (multi-project mode)
         for entry in fs::read_dir(&self.root_dir).map_err(HornetError::IoError)? {
             let entry = entry.map_err(HornetError::IoError)?;
 
@@ -59,11 +75,21 @@ impl ProjectScanner {
 
     /// 単一プロジェクトのメタデータを読み込み
     pub fn load_project_metadata(&self, project_dir: &Path) -> Result<ProjectMetadata> {
-        let project_name = project_dir
-            .file_name()
-            .and_then(|n| n.to_str())
-            .ok_or_else(|| HornetError::InvalidPath("Invalid project directory name".into()))?
-            .to_string();
+        // Get project name from directory name, or use canonical path's file_name for root dir
+        let project_name = if project_dir == self.root_dir {
+            // For root directory, use the absolute path's last component
+            project_dir
+                .canonicalize()
+                .ok()
+                .and_then(|p| p.file_name().map(|n| n.to_string_lossy().to_string()))
+                .unwrap_or_else(|| "default".to_string())
+        } else {
+            project_dir
+                .file_name()
+                .and_then(|n| n.to_str())
+                .ok_or_else(|| HornetError::InvalidPath("Invalid project directory name".into()))?
+                .to_string()
+        };
 
         let arazzo_path = project_dir.join("arazzo.yaml");
 

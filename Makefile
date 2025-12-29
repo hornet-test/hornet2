@@ -18,8 +18,8 @@ else
   PNPM = cd ui && pnpm
 endif
 
-# テストファイル（必要に応じて変更）
-TEST_ROOT_DIR := tests/fixtures/multi_project
+# Development mode uses hornet2's own files
+DEV_ROOT_DIR := .
 # Legacy single-file mode (for other commands)
 TEST_ARAZZO := tests/fixtures/arazzo.yaml
 TEST_OPENAPI := tests/fixtures/openapi.yaml
@@ -72,16 +72,18 @@ dev: ## 開発モード: CLIサーバーとUIを同時起動（Ctrl+Cで両方�
 	@echo "$(BLUE)Starting development servers...$(NC)"
 	@echo "$(YELLOW)CLI Server: http://localhost:3000$(NC)"
 	@echo "$(YELLOW)UI Dev Server: http://localhost:5173$(NC)"
+	@echo "$(YELLOW)Using hornet2's own OpenAPI and Arazzo files$(NC)"
 	@echo ""
 	@echo "$(YELLOW)Press Ctrl+C to stop all servers$(NC)"
 	@echo ""
 	@trap 'kill 0' EXIT; \
 		$(PNPM) dev & \
-		cargo run -- serve --root-dir $(TEST_ROOT_DIR) --port 3000
+		cargo run -- serve --root-dir $(DEV_ROOT_DIR) --port 3000
 
 cli-dev: ## CLIサーバーのみ起動
 	@echo "$(BLUE)Starting CLI server on http://localhost:3000$(NC)"
-	@cargo run -- serve --root-dir $(TEST_ROOT_DIR) --port 3000
+	@echo "$(YELLOW)Using hornet2's own OpenAPI and Arazzo files$(NC)"
+	@cargo run -- serve --root-dir $(DEV_ROOT_DIR) --port 3000
 
 ui-dev: ## UI開発サーバーのみ起動
 	@echo "$(BLUE)Starting UI dev server on http://localhost:5173$(NC)"
