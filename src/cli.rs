@@ -49,19 +49,19 @@ pub enum Commands {
         output: Option<PathBuf>,
     },
 
-    /// Start web server for visualization
+    /// Start web server for visualization (multi-project mode)
     Serve {
-        /// Path to Arazzo file
+        /// Root directory containing project folders
         #[arg(short, long)]
-        arazzo: PathBuf,
-
-        /// Path to OpenAPI file (optional)
-        #[arg(short, long)]
-        openapi: Option<PathBuf>,
+        root_dir: PathBuf,
 
         /// Port number
         #[arg(short, long, default_value = "3000")]
         port: u16,
+
+        /// Default project name (for compatibility API)
+        #[arg(long)]
+        default_project: Option<String>,
     },
 
     /// Convert Arazzo workflow to test script

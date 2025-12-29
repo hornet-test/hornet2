@@ -3,46 +3,51 @@ pub mod state;
 
 use axum::{
     http::StatusCode,
-    routing::{get, post},
+    routing::get,
     Router,
 };
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber;
 
-/// Webサーバーを起動する
+use state::AppState;
+
+/// Webサーバーを起動する（マルチプロジェクトモード）
 pub async fn start_server(
     addr: SocketAddr,
-    arazzo_path: String,
-    openapi_path: Option<String>,
+    root_dir: PathBuf,
+    default_project: Option<String>,
 ) -> crate::Result<()> {
     // トレーシングを初期化
     tracing_subscriber::fmt::init();
 
     // 共有状態を作成
-    let state = api::AppState {
-        arazzo_path,
-        openapi_path,
-    };
+    let state = AppState::new(root_dir, default_project)?;
 
     // ルーターを構築
     let app = Router::new()
-        // Arazzo Resource API - RESTful hierarchical design
-        .route("/api/arazzo", get(api::get_spec).put(api::update_spec))
+        // Multi-Project API
+        .route("/api/projects", get(api::list_projects))
+        .route("/api/projects/{project_name}", get(api::get_project))
         .route(
-            "/api/arazzo/workflows",
-            get(api::get_workflows).post(api::create_workflow),
+            "/api/projects/{project_name}/arazzo",
+            get(api::get_project_arazzo).put(api::update_project_arazzo),
         )
         .route(
-            "/api/arazzo/workflows/{workflow_id}",
-            get(api::get_workflow)
-                .put(api::update_workflow)
-                .delete(api::delete_workflow),
+            "/api/projects/{project_name}/workflows",
+            get(api::get_project_workflows).post(api::create_project_workflow),
         )
-        .route("/api/arazzo/graph/{workflow_id}", get(api::get_graph))
-        // Editor API
-        .route("/api/editor/operations", get(api::get_operations))
-        .route("/api/editor/validate", post(api::validate_arazzo))
+        .route(
+            "/api/projects/{project_name}/workflows/{workflow_id}",
+            get(api::get_project_workflow)
+                .put(api::update_project_workflow)
+                .delete(api::delete_project_workflow),
+        )
+        .route(
+            "/api/projects/{project_name}/graph/{workflow_id}",
+            get(api::get_project_graph),
+        )
         // Static files (CSS, JS) - from dist folder
         .route("/assets/{*path}", get(serve_static))
         // ルートルートはindex.htmlを提供
@@ -156,21 +161,18 @@ cargo run -- serve --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/
     <div class="info">
         <h2>📡 API Endpoints</h2>
         <p>The following API endpoints are available:</p>
-        <h3>Arazzo Resource API</h3>
+        <h3>Multi-Project API</h3>
         <ul>
-            <li><code>GET /api/arazzo</code> - Get full Arazzo specification</li>
-            <li><code>PUT /api/arazzo</code> - Update full Arazzo specification</li>
-            <li><code>GET /api/arazzo/workflows</code> - List all workflows</li>
-            <li><code>POST /api/arazzo/workflows</code> - Create new workflow</li>
-            <li><code>GET /api/arazzo/workflows/{id}</code> - Get specific workflow</li>
-            <li><code>PUT /api/arazzo/workflows/{id}</code> - Update specific workflow</li>
-            <li><code>DELETE /api/arazzo/workflows/{id}</code> - Delete specific workflow</li>
-            <li><code>GET /api/arazzo/graph/{id}</code> - Get workflow graph visualization</li>
-        </ul>
-        <h3>Editor API</h3>
-        <ul>
-            <li><code>GET /api/editor/operations</code> - Get OpenAPI operations</li>
-            <li><code>POST /api/editor/validate</code> - Validate Arazzo YAML</li>
+            <li><code>GET /api/projects</code> - List all projects</li>
+            <li><code>GET /api/projects/{project_name}</code> - Get project details</li>
+            <li><code>GET /api/projects/{project_name}/arazzo</code> - Get Arazzo specification</li>
+            <li><code>PUT /api/projects/{project_name}/arazzo</code> - Update Arazzo specification</li>
+            <li><code>GET /api/projects/{project_name}/workflows</code> - List all workflows</li>
+            <li><code>POST /api/projects/{project_name}/workflows</code> - Create new workflow</li>
+            <li><code>GET /api/projects/{project_name}/workflows/{id}</code> - Get specific workflow</li>
+            <li><code>PUT /api/projects/{project_name}/workflows/{id}</code> - Update specific workflow</li>
+            <li><code>DELETE /api/projects/{project_name}/workflows/{id}</code> - Delete specific workflow</li>
+            <li><code>GET /api/projects/{project_name}/graph/{id}</code> - Get workflow graph visualization</li>
         </ul>
     </div>
 </body>
