@@ -1,0 +1,30 @@
+arazzo: 1.0.0
+info:
+  title: Project 2 User API Testing
+  version: 1.0.0
+  description: Test workflows for user management
+sourceDescriptions:
+  - name: userapi
+    url: openapi.yaml
+    type: openapi
+workflows:
+  - workflowId: create-user-workflow
+    summary: Create a new user
+    description: User creation workflow
+    steps:
+      - stepId: create-user
+        operationId: createUser
+        requestBody:
+          contentType: application/json
+          payload:
+            name: John Doe
+            email: john@example.com
+  - workflowId: get-user-workflow
+    summary: Get user by ID
+    steps:
+      - stepId: get-user
+        operationId: getUserById
+        parameters:
+          - name: userId
+            in: path
+            value: 1
