@@ -5,10 +5,11 @@ import { YamlEditor } from '../components/YamlEditor';
 import { DataSourcePanel } from '../components/DataSourcePanel';
 import { SuggestionPanel } from '../components/SuggestionPanel';
 import { useEditorStore } from '../stores/editorStore';
+import { useProjectStore } from '../stores/projectStore';
 
 export const EditorPage: React.FC = () => {
+  const { currentProject } = useProjectStore();
   const {
-    loadOperations,
     isLoading,
     error,
     operations,
@@ -24,12 +25,15 @@ export const EditorPage: React.FC = () => {
     dataFlowSuggestions,
     applySuggestion,
     dismissSuggestion,
+    loadOperations,
   } = useEditorStore();
   const [viewMode, setViewMode] = useState<'visual' | 'yaml' | 'split'>('split');
 
   useEffect(() => {
-    void loadOperations();
-  }, [loadOperations]);
+    if (currentProject) {
+      void loadOperations(currentProject);
+    }
+  }, [loadOperations, currentProject]);
 
   if (isLoading) {
     return (

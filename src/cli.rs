@@ -58,10 +58,6 @@ pub enum Commands {
         /// Port number
         #[arg(short, long, default_value = "3000")]
         port: u16,
-
-        /// Default project name (for compatibility API)
-        #[arg(long)]
-        default_project: Option<String>,
     },
 
     /// Convert Arazzo workflow to test script

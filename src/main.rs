@@ -23,12 +23,8 @@ async fn main() -> Result<()> {
         } => {
             commands::execute_visualize(&arazzo, &openapi, &format, &output)?;
         }
-        Commands::Serve {
-            root_dir,
-            port,
-            default_project,
-        } => {
-            commands::execute_serve(&root_dir, port, default_project).await?;
+        Commands::Serve { root_dir, port } => {
+            commands::execute_serve(&root_dir, port).await?;
         }
         Commands::Convert {
             arazzo,

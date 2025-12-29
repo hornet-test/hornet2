@@ -10,6 +10,7 @@ import type {
   StatusMessage,
   WorkflowSummary,
 } from '../types/graph';
+import { useProjectStore } from '../stores/projectStore';
 
 const layoutOptions: LayoutOption[] = [
   { value: 'dagre', label: 'Hierarchical (Dagre)' },
@@ -19,11 +20,12 @@ const layoutOptions: LayoutOption[] = [
 ];
 
 export const VisualizationPage: React.FC = () => {
+  const { currentProject: project } = useProjectStore();
   const [workflows, setWorkflows] = useState<WorkflowSummary[]>([]);
   const [selectedWorkflow, setSelectedWorkflow] = useState<string>('');
   const [layout, setLayout] = useState<LayoutOption['value']>('dagre');
   const [status, setStatus] = useState<StatusMessage>({
-    message: 'Loading workflows...',
+    message: 'Loading projects...',
     type: 'info',
   });
   const [graph, setGraph] = useState<GraphData | null>(null);
@@ -34,10 +36,14 @@ export const VisualizationPage: React.FC = () => {
     [selectedWorkflow, workflows],
   );
 
+  // Removed fetchProjects and replaced with store usage is implicit by removing the definition
+
+
   const fetchWorkflows = useCallback(async () => {
+    if (!project) return;
     try {
       setStatus({ message: 'Loading workflows...', type: 'info' });
-      const response = await fetch('/api/arazzo/workflows');
+      const response = await fetch(`/api/projects/${project}/workflows`);
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       const data = (await response.json()) as { workflows?: WorkflowSummary[] };
       const newWorkflows = data.workflows ?? [];
@@ -48,7 +54,7 @@ export const VisualizationPage: React.FC = () => {
       } else {
         setSelectedWorkflow('');
         setGraph(null);
-        setStatus({ message: 'No workflows found. Please load an Arazzo file.', type: 'error' });
+        setStatus({ message: `No workflows found for project ${project}`, type: 'error' });
         return;
       }
 
@@ -56,13 +62,13 @@ export const VisualizationPage: React.FC = () => {
     } catch (error) {
       setStatus({ message: `Error: ${(error as Error).message}`, type: 'error' });
     }
-  }, []);
+  }, [project]);
 
   const fetchGraph = useCallback(async (workflowId: string) => {
-    if (!workflowId) return;
+    if (!workflowId || !project) return;
     try {
       setStatus({ message: `Loading graph for ${workflowId}...`, type: 'info' });
-      const response = await fetch(`/api/arazzo/graph/${encodeURIComponent(workflowId)}`);
+      const response = await fetch(`/api/projects/${project}/graph/${encodeURIComponent(workflowId)}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       const data = (await response.json()) as GraphData;
       setGraph(data);
@@ -73,17 +79,22 @@ export const VisualizationPage: React.FC = () => {
     } catch (error) {
       setStatus({ message: `Error: ${(error as Error).message}`, type: 'error' });
     }
-  }, []);
+  }, [project]);
+
+  // Removed fetchProjects effect
+
 
   useEffect(() => {
-    void fetchWorkflows();
-  }, [fetchWorkflows]);
+    if (project) {
+      void fetchWorkflows();
+    }
+  }, [project, fetchWorkflows]);
 
   useEffect(() => {
-    if (selectedWorkflow) {
+    if (selectedWorkflow && project) {
       void fetchGraph(selectedWorkflow);
     }
-  }, [fetchGraph, selectedWorkflow]);
+  }, [fetchGraph, selectedWorkflow, project]);
 
   const handleWorkflowChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedWorkflow(event.target.value);

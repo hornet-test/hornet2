@@ -33,7 +33,7 @@ interface EditorState {
   error: string | null;
 
   // Actions
-  loadOperations: () => Promise<void>;
+  loadOperations: (projectName: string) => Promise<void>;
   setArazzoSpec: (spec: ArazzoSpec) => void;
   setYamlContent: (yaml: string) => void;
   syncYamlToSpec: () => void;
@@ -84,10 +84,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   error: null,
 
   // Load operations from API
-  loadOperations: async () => {
+  loadOperations: async (projectName: string) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('/api/editor/operations');
+      const response = await fetch(`/api/projects/${projectName}/operations`);
       if (!response.ok) {
         throw new Error(`Failed to load operations: ${response.statusText}`);
       }
@@ -153,7 +153,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // Validate YAML with backend
   validateYaml: async (yamlStr: string) => {
     try {
-      const response = await fetch('/api/editor/validate', {
+      const response = await fetch('/api/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ yaml: yamlStr }),

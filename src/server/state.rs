@@ -14,19 +14,15 @@ pub struct AppState {
 
     /// ルートディレクトリパス
     pub root_dir: PathBuf,
-
-    /// デフォルトプロジェクト名（互換性API用）
-    pub default_project: Option<String>,
 }
 
 impl AppState {
-    pub fn new(root_dir: PathBuf, default_project: Option<String>) -> Result<Self> {
+    pub fn new(root_dir: PathBuf) -> Result<Self> {
         let cache = ProjectCache::new(Duration::from_secs(60));
 
         Ok(Self {
             projects: Arc::new(RwLock::new(cache)),
             root_dir,
-            default_project,
         })
     }
 }

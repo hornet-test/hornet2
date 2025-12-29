@@ -10,16 +10,12 @@ use tracing_subscriber;
 use state::AppState;
 
 /// Webサーバーを起動する（マルチプロジェクトモード）
-pub async fn start_server(
-    addr: SocketAddr,
-    root_dir: PathBuf,
-    default_project: Option<String>,
-) -> crate::Result<()> {
+pub async fn start_server(addr: SocketAddr, root_dir: PathBuf) -> crate::Result<()> {
     // トレーシングを初期化
     tracing_subscriber::fmt::init();
 
     // 共有状態を作成
-    let state = AppState::new(root_dir, default_project)?;
+    let state = AppState::new(root_dir)?;
 
     // ルーターを構築
     let app = Router::new()
@@ -44,6 +40,12 @@ pub async fn start_server(
             "/api/projects/{project_name}/graph/{workflow_id}",
             get(api::get_project_graph),
         )
+        // Editor API
+        .route(
+            "/api/projects/{project_name}/operations",
+            get(api::get_project_operations),
+        )
+        .route("/api/validate", axum::routing::post(api::validate_arazzo))
         // Static files (CSS, JS) - from dist folder
         .route("/assets/{*path}", get(serve_static))
         // ルートルートはindex.htmlを提供
