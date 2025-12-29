@@ -9,6 +9,15 @@ GREEN := \033[0;32m
 YELLOW := \033[0;33m
 NC := \033[0m # No Color
 
+# pnpmコマンドの検出（miseが利用可能ならmise経由、なければ直接pnpm）
+MISE_AVAILABLE := $(shell command -v mise > /dev/null 2>&1 && echo "1" || echo "0")
+
+ifeq ($(MISE_AVAILABLE),1)
+  PNPM = mise exec -- pnpm --dir ui
+else
+  PNPM = cd ui && pnpm
+endif
+
 # テストファイル（必要に応じて変更）
 TEST_ROOT_DIR := tests/fixtures/multi_project
 # Legacy single-file mode (for other commands)
@@ -25,7 +34,7 @@ install: ## 依存関係をすべてインストール
 	@echo "$(BLUE)Installing Rust dependencies...$(NC)"
 	@cargo fetch
 	@echo "$(BLUE)Installing UI dependencies...$(NC)"
-	@cd ui && pnpm install
+	@$(PNPM) install
 	@echo "$(GREEN)✓ All dependencies installed$(NC)"
 
 build: cli-build ui-build ## CLIとUIを両方ビルド
@@ -38,22 +47,22 @@ cli-build: ## Rust CLIをビルド
 
 ui-build: ## UIをビルド
 	@echo "$(BLUE)Building UI...$(NC)"
-	@cd ui && pnpm build
+	@$(PNPM) build
 	@echo "$(GREEN)✓ UI built: ui/dist/$(NC)"
 
 ui-lint: ## UIのLintを実行
 	@echo "$(BLUE)Running UI lint...$(NC)"
-	@cd ui && pnpm lint
+	@$(PNPM) lint
 	@echo "$(GREEN)✓ UI lint passed$(NC)"
 
 ui-typecheck: ## UIの型チェックを実行
 	@echo "$(BLUE)Running UI typecheck...$(NC)"
-	@cd ui && pnpm typecheck
+	@$(PNPM) typecheck
 	@echo "$(GREEN)✓ UI typecheck passed$(NC)"
 
 ui-format: ## UIのコードを整形
 	@echo "$(BLUE)Formatting UI code...$(NC)"
-	@cd ui && pnpm format
+	@$(PNPM) format
 	@echo "$(GREEN)✓ UI formatted$(NC)"
 
 lint: ui-lint ## すべてのLintを実行
@@ -67,7 +76,7 @@ dev: ## 開発モード: CLIサーバーとUIを同時起動（Ctrl+Cで両方�
 	@echo "$(YELLOW)Press Ctrl+C to stop all servers$(NC)"
 	@echo ""
 	@trap 'kill 0' EXIT; \
-		(cd ui && pnpm dev) & \
+		$(PNPM) dev & \
 		cargo run -- serve --root-dir $(TEST_ROOT_DIR) --port 3000
 
 cli-dev: ## CLIサーバーのみ起動
@@ -76,7 +85,7 @@ cli-dev: ## CLIサーバーのみ起動
 
 ui-dev: ## UI開発サーバーのみ起動
 	@echo "$(BLUE)Starting UI dev server on http://localhost:5173$(NC)"
-	@cd ui && pnpm dev
+	@$(PNPM) dev
 
 test: cli-test ui-test ## すべてのテストを実行
 	@echo "$(GREEN)✓ All tests passed$(NC)"
@@ -87,10 +96,10 @@ cli-test: ## Rustのテストを実行
 
 ui-test: ## UIのテストを実行
 	@echo "$(BLUE)Running UI tests...$(NC)"
-	@cd ui && pnpm test:run
+	@$(PNPM) test:run
 
 ui-test-watch: ## UIのテストをwatchモードで実行
-	@cd ui && pnpm test
+	@$(PNPM) test
 
 clean: ## ビルド成果物をクリーンアップ
 	@echo "$(BLUE)Cleaning build artifacts...$(NC)"
@@ -103,14 +112,14 @@ check: ## コードのチェック（フォーマット・lint）
 	@cargo fmt --check
 	@cargo clippy -- -D warnings
 	@echo "$(BLUE)Checking UI code...$(NC)"
-	@cd ui && pnpm typecheck
-	@cd ui && pnpm lint
+	@$(PNPM) typecheck
+	@$(PNPM) lint
 	@echo "$(GREEN)✓ Code check passed$(NC)"
 
 fmt: ## コードをフォーマット
 	@echo "$(BLUE)Formatting code...$(NC)"
 	@cargo fmt
-	@cd ui && pnpm format
+	@$(PNPM) format
 	@echo "$(GREEN)✓ Code formatted$(NC)"
 
 run: ## CLIを実行（引数: ARGS="..."）

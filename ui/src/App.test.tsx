@@ -39,15 +39,15 @@ describe('App', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
-    const stringifyRequest = (request: RequestInfo | URL) => {
-      if (typeof request === 'string') return request;
-      if (request instanceof URL) return request.toString();
-      if (request instanceof Request) return request.url;
-      return '[unknown request]';
-    };
 
     const fetchMock = vi.fn<typeof fetch>((url) => {
-      const urlStr = typeof url === 'string' ? url : url.toString();
+      const urlStr = typeof url === 'string'
+        ? url
+        : url instanceof URL
+        ? url.href
+        : url instanceof Request
+        ? url.url
+        : String(url);
 
       if (urlStr === '/api/projects') {
         return Promise.resolve({
