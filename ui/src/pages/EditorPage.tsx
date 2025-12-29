@@ -116,7 +116,7 @@ export const EditorPage: React.FC = () => {
               <span className="badge">{dataFlowSuggestions.length}</span>
             )}
           </button>
-         </div>
+        </div>
       </div>
 
       <div className="editor-layout">
