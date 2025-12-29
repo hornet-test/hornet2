@@ -30,8 +30,8 @@ impl ProjectScanner {
     pub fn scan_projects(&self) -> Result<Vec<ProjectMetadata>> {
         let mut projects = Vec::new();
 
-        for entry in fs::read_dir(&self.root_dir).map_err(|e| HornetError::IoError(e))? {
-            let entry = entry.map_err(|e| HornetError::IoError(e))?;
+        for entry in fs::read_dir(&self.root_dir).map_err(HornetError::IoError)? {
+            let entry = entry.map_err(HornetError::IoError)?;
 
             let path = entry.path();
 
@@ -91,8 +91,8 @@ impl ProjectScanner {
     fn discover_openapi_files(&self, project_dir: &Path) -> Result<Vec<PathBuf>> {
         let mut openapi_files = Vec::new();
 
-        for entry in fs::read_dir(project_dir).map_err(|e| HornetError::IoError(e))? {
-            let entry = entry.map_err(|e| HornetError::IoError(e))?;
+        for entry in fs::read_dir(project_dir).map_err(HornetError::IoError)? {
+            let entry = entry.map_err(HornetError::IoError)?;
 
             let path = entry.path();
 
