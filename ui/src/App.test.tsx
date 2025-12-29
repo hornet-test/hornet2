@@ -41,13 +41,14 @@ describe('App', () => {
     vi.restoreAllMocks();
 
     const fetchMock = vi.fn<typeof fetch>((url) => {
-      const urlStr = typeof url === 'string'
-        ? url
-        : url instanceof URL
-        ? url.href
-        : url instanceof Request
-        ? url.url
-        : String(url);
+      const urlStr =
+        typeof url === 'string'
+          ? url
+          : url instanceof URL
+            ? url.href
+            : url instanceof Request
+              ? url.url
+              : String(url);
 
       if (urlStr === '/api/projects') {
         return Promise.resolve({
