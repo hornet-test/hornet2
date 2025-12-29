@@ -932,14 +932,16 @@ pub async fn get_project(
         )
     })?;
 
-    let project = cache.get_project(&project_name, &state.root_dir).map_err(|e| {
-        ProblemDetails::new(
-            StatusCode::NOT_FOUND,
-            "project-not-found",
-            "Project Not Found",
-            format!("Project '{}' not found: {}", project_name, e),
-        )
-    })?;
+    let project = cache
+        .get_project(&project_name, &state.root_dir)
+        .map_err(|e| {
+            ProblemDetails::new(
+                StatusCode::NOT_FOUND,
+                "project-not-found",
+                "Project Not Found",
+                format!("Project '{}' not found: {}", project_name, e),
+            )
+        })?;
 
     let project_detail = ProjectDetail {
         name: project.name.clone(),
@@ -981,14 +983,16 @@ pub async fn get_project_arazzo(
         )
     })?;
 
-    let project = cache.get_project(&project_name, &state.root_dir).map_err(|e| {
-        ProblemDetails::new(
-            StatusCode::NOT_FOUND,
-            "project-not-found",
-            "Project Not Found",
-            format!("Project '{}' not found: {}", project_name, e),
-        )
-    })?;
+    let project = cache
+        .get_project(&project_name, &state.root_dir)
+        .map_err(|e| {
+            ProblemDetails::new(
+                StatusCode::NOT_FOUND,
+                "project-not-found",
+                "Project Not Found",
+                format!("Project '{}' not found: {}", project_name, e),
+            )
+        })?;
 
     Ok(Json(project.arazzo_spec.clone()))
 }
@@ -1018,14 +1022,16 @@ pub async fn update_project_arazzo(
         )
     })?;
 
-    let project = cache.get_project(&project_name, &state.root_dir).map_err(|e| {
-        ProblemDetails::new(
-            StatusCode::NOT_FOUND,
-            "project-not-found",
-            "Project Not Found",
-            format!("Project '{}' not found: {}", project_name, e),
-        )
-    })?;
+    let project = cache
+        .get_project(&project_name, &state.root_dir)
+        .map_err(|e| {
+            ProblemDetails::new(
+                StatusCode::NOT_FOUND,
+                "project-not-found",
+                "Project Not Found",
+                format!("Project '{}' not found: {}", project_name, e),
+            )
+        })?;
 
     loader::save_arazzo(&project.arazzo_path, &spec).map_err(|e| {
         ProblemDetails::new(
@@ -1037,14 +1043,16 @@ pub async fn update_project_arazzo(
     })?;
 
     // キャッシュを再読み込み
-    cache.reload_project(&project_name, &state.root_dir).map_err(|e| {
-        ProblemDetails::new(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "cache-reload-failed",
-            "Cache Reload Failed",
-            format!("Failed to reload project cache: {}", e),
-        )
-    })?;
+    cache
+        .reload_project(&project_name, &state.root_dir)
+        .map_err(|e| {
+            ProblemDetails::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "cache-reload-failed",
+                "Cache Reload Failed",
+                format!("Failed to reload project cache: {}", e),
+            )
+        })?;
 
     Ok(Json(spec))
 }
@@ -1071,14 +1079,16 @@ pub async fn get_project_workflows(
         )
     })?;
 
-    let project = cache.get_project(&project_name, &state.root_dir).map_err(|e| {
-        ProblemDetails::new(
-            StatusCode::NOT_FOUND,
-            "project-not-found",
-            "Project Not Found",
-            format!("Project '{}' not found: {}", project_name, e),
-        )
-    })?;
+    let project = cache
+        .get_project(&project_name, &state.root_dir)
+        .map_err(|e| {
+            ProblemDetails::new(
+                StatusCode::NOT_FOUND,
+                "project-not-found",
+                "Project Not Found",
+                format!("Project '{}' not found: {}", project_name, e),
+            )
+        })?;
 
     let workflows: Vec<WorkflowInfo> = project
         .arazzo_spec
@@ -1119,14 +1129,16 @@ pub async fn create_project_workflow(
         )
     })?;
 
-    let project = cache.get_project(&project_name, &state.root_dir).map_err(|e| {
-        ProblemDetails::new(
-            StatusCode::NOT_FOUND,
-            "project-not-found",
-            "Project Not Found",
-            format!("Project '{}' not found: {}", project_name, e),
-        )
-    })?;
+    let project = cache
+        .get_project(&project_name, &state.root_dir)
+        .map_err(|e| {
+            ProblemDetails::new(
+                StatusCode::NOT_FOUND,
+                "project-not-found",
+                "Project Not Found",
+                format!("Project '{}' not found: {}", project_name, e),
+            )
+        })?;
 
     let mut arazzo = loader::load_arazzo(&project.arazzo_path).map_err(|e| {
         ProblemDetails::new(
@@ -1168,14 +1180,16 @@ pub async fn create_project_workflow(
     })?;
 
     // キャッシュを再読み込み
-    cache.reload_project(&project_name, &state.root_dir).map_err(|e| {
-        ProblemDetails::new(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "cache-reload-failed",
-            "Cache Reload Failed",
-            format!("Failed to reload project cache: {}", e),
-        )
-    })?;
+    cache
+        .reload_project(&project_name, &state.root_dir)
+        .map_err(|e| {
+            ProblemDetails::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "cache-reload-failed",
+                "Cache Reload Failed",
+                format!("Failed to reload project cache: {}", e),
+            )
+        })?;
 
     Ok((StatusCode::CREATED, Json(req.workflow)))
 }
@@ -1203,14 +1217,16 @@ pub async fn get_project_workflow(
         )
     })?;
 
-    let project = cache.get_project(&project_name, &state.root_dir).map_err(|e| {
-        ProblemDetails::new(
-            StatusCode::NOT_FOUND,
-            "project-not-found",
-            "Project Not Found",
-            format!("Project '{}' not found: {}", project_name, e),
-        )
-    })?;
+    let project = cache
+        .get_project(&project_name, &state.root_dir)
+        .map_err(|e| {
+            ProblemDetails::new(
+                StatusCode::NOT_FOUND,
+                "project-not-found",
+                "Project Not Found",
+                format!("Project '{}' not found: {}", project_name, e),
+            )
+        })?;
 
     let workflow = project
         .arazzo_spec
@@ -1266,14 +1282,16 @@ pub async fn update_project_workflow(
         )
     })?;
 
-    let project = cache.get_project(&project_name, &state.root_dir).map_err(|e| {
-        ProblemDetails::new(
-            StatusCode::NOT_FOUND,
-            "project-not-found",
-            "Project Not Found",
-            format!("Project '{}' not found: {}", project_name, e),
-        )
-    })?;
+    let project = cache
+        .get_project(&project_name, &state.root_dir)
+        .map_err(|e| {
+            ProblemDetails::new(
+                StatusCode::NOT_FOUND,
+                "project-not-found",
+                "Project Not Found",
+                format!("Project '{}' not found: {}", project_name, e),
+            )
+        })?;
 
     let mut arazzo = loader::load_arazzo(&project.arazzo_path).map_err(|e| {
         ProblemDetails::new(
@@ -1310,14 +1328,16 @@ pub async fn update_project_workflow(
     })?;
 
     // キャッシュを再読み込み
-    cache.reload_project(&project_name, &state.root_dir).map_err(|e| {
-        ProblemDetails::new(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "cache-reload-failed",
-            "Cache Reload Failed",
-            format!("Failed to reload project cache: {}", e),
-        )
-    })?;
+    cache
+        .reload_project(&project_name, &state.root_dir)
+        .map_err(|e| {
+            ProblemDetails::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "cache-reload-failed",
+                "Cache Reload Failed",
+                format!("Failed to reload project cache: {}", e),
+            )
+        })?;
 
     Ok(Json(workflow))
 }
@@ -1345,14 +1365,16 @@ pub async fn delete_project_workflow(
         )
     })?;
 
-    let project = cache.get_project(&project_name, &state.root_dir).map_err(|e| {
-        ProblemDetails::new(
-            StatusCode::NOT_FOUND,
-            "project-not-found",
-            "Project Not Found",
-            format!("Project '{}' not found: {}", project_name, e),
-        )
-    })?;
+    let project = cache
+        .get_project(&project_name, &state.root_dir)
+        .map_err(|e| {
+            ProblemDetails::new(
+                StatusCode::NOT_FOUND,
+                "project-not-found",
+                "Project Not Found",
+                format!("Project '{}' not found: {}", project_name, e),
+            )
+        })?;
 
     let mut arazzo = loader::load_arazzo(&project.arazzo_path).map_err(|e| {
         ProblemDetails::new(
@@ -1385,14 +1407,16 @@ pub async fn delete_project_workflow(
     })?;
 
     // キャッシュを再読み込み
-    cache.reload_project(&project_name, &state.root_dir).map_err(|e| {
-        ProblemDetails::new(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "cache-reload-failed",
-            "Cache Reload Failed",
-            format!("Failed to reload project cache: {}", e),
-        )
-    })?;
+    cache
+        .reload_project(&project_name, &state.root_dir)
+        .map_err(|e| {
+            ProblemDetails::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "cache-reload-failed",
+                "Cache Reload Failed",
+                format!("Failed to reload project cache: {}", e),
+            )
+        })?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -1420,14 +1444,16 @@ pub async fn get_project_graph(
         )
     })?;
 
-    let project = cache.get_project(&project_name, &state.root_dir).map_err(|e| {
-        ProblemDetails::new(
-            StatusCode::NOT_FOUND,
-            "project-not-found",
-            "Project Not Found",
-            format!("Project '{}' not found: {}", project_name, e),
-        )
-    })?;
+    let project = cache
+        .get_project(&project_name, &state.root_dir)
+        .map_err(|e| {
+            ProblemDetails::new(
+                StatusCode::NOT_FOUND,
+                "project-not-found",
+                "Project Not Found",
+                format!("Project '{}' not found: {}", project_name, e),
+            )
+        })?;
 
     // Find workflow
     let workflow = project
@@ -1445,11 +1471,7 @@ pub async fn get_project_graph(
         })?;
 
     // Get first OpenAPI spec if available
-    let openapi = project
-        .openapi_resolver
-        .get_all_specs()
-        .values()
-        .next();
+    let openapi = project.openapi_resolver.get_all_specs().values().next();
 
     // Build graph
     let graph = build_flow_graph(workflow, openapi).map_err(|e| {

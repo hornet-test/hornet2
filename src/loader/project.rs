@@ -1,6 +1,6 @@
 use crate::error::{HornetError, Result};
-use crate::models::arazzo::ArazzoSpec;
 use crate::loader;
+use crate::models::arazzo::ArazzoSpec;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -30,12 +30,8 @@ impl ProjectScanner {
     pub fn scan_projects(&self) -> Result<Vec<ProjectMetadata>> {
         let mut projects = Vec::new();
 
-        for entry in fs::read_dir(&self.root_dir).map_err(|e| {
-            HornetError::IoError(e)
-        })? {
-            let entry = entry.map_err(|e| {
-                HornetError::IoError(e)
-            })?;
+        for entry in fs::read_dir(&self.root_dir).map_err(|e| HornetError::IoError(e))? {
+            let entry = entry.map_err(|e| HornetError::IoError(e))?;
 
             let path = entry.path();
 
@@ -47,8 +43,11 @@ impl ProjectScanner {
                         Ok(meta) => projects.push(meta),
                         Err(e) => {
                             // ログ警告して続行
-                            eprintln!("Warning: Failed to load project at {}: {}",
-                                     path.display(), e);
+                            eprintln!(
+                                "Warning: Failed to load project at {}: {}",
+                                path.display(),
+                                e
+                            );
                         }
                     }
                 }
@@ -63,17 +62,16 @@ impl ProjectScanner {
         let project_name = project_dir
             .file_name()
             .and_then(|n| n.to_str())
-            .ok_or_else(|| {
-                HornetError::InvalidPath("Invalid project directory name".into())
-            })?
+            .ok_or_else(|| HornetError::InvalidPath("Invalid project directory name".into()))?
             .to_string();
 
         let arazzo_path = project_dir.join("arazzo.yaml");
 
         if !arazzo_path.exists() {
-            return Err(HornetError::ArazzoLoadError(
-                format!("arazzo.yaml not found in {}", project_dir.display())
-            ));
+            return Err(HornetError::ArazzoLoadError(format!(
+                "arazzo.yaml not found in {}",
+                project_dir.display()
+            )));
         }
 
         let arazzo_spec = loader::load_arazzo(&arazzo_path)?;
@@ -93,19 +91,18 @@ impl ProjectScanner {
     fn discover_openapi_files(&self, project_dir: &Path) -> Result<Vec<PathBuf>> {
         let mut openapi_files = Vec::new();
 
-        for entry in fs::read_dir(project_dir).map_err(|e| {
-            HornetError::IoError(e)
-        })? {
-            let entry = entry.map_err(|e| {
-                HornetError::IoError(e)
-            })?;
+        for entry in fs::read_dir(project_dir).map_err(|e| HornetError::IoError(e))? {
+            let entry = entry.map_err(|e| HornetError::IoError(e))?;
 
             let path = entry.path();
 
             if path.is_file() {
                 if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
-                    if (filename.starts_with("openapi") || filename == "openapi.yaml" || filename == "openapi.yml")
-                       && (filename.ends_with(".yaml") || filename.ends_with(".yml")) {
+                    if (filename.starts_with("openapi")
+                        || filename == "openapi.yaml"
+                        || filename == "openapi.yml")
+                        && (filename.ends_with(".yaml") || filename.ends_with(".yml"))
+                    {
                         openapi_files.push(path);
                     }
                 }
@@ -145,7 +142,8 @@ workflows:
       - stepId: step1
         operationId: op1
 "#,
-        ).unwrap();
+        )
+        .unwrap();
         fs::write(
             project1.join("openapi.yaml"),
             r#"openapi: 3.0.0
@@ -160,7 +158,8 @@ paths:
         '200':
           description: OK
 "#,
-        ).unwrap();
+        )
+        .unwrap();
 
         // プロジェクト2
         let project2 = root.join("project2");
@@ -178,7 +177,8 @@ workflows:
       - stepId: step1
         operationId: op2
 "#,
-        ).unwrap();
+        )
+        .unwrap();
 
         // arazzo.yamlのないディレクトリ（無視される）
         let not_project = root.join("not_a_project");

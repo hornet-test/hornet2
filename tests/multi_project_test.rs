@@ -20,12 +20,18 @@ fn test_scan_multi_project_fixtures() {
     let project1 = projects.iter().find(|p| p.name == "project1").unwrap();
     assert_eq!(project1.arazzo_spec.info.title, "Project 1 API Testing");
     assert_eq!(project1.arazzo_spec.workflows.len(), 1);
-    assert_eq!(project1.arazzo_spec.workflows[0].workflow_id, "get-pet-workflow");
+    assert_eq!(
+        project1.arazzo_spec.workflows[0].workflow_id,
+        "get-pet-workflow"
+    );
     assert_eq!(project1.openapi_paths.len(), 1);
 
     // project2の検証
     let project2 = projects.iter().find(|p| p.name == "project2").unwrap();
-    assert_eq!(project2.arazzo_spec.info.title, "Project 2 User API Testing");
+    assert_eq!(
+        project2.arazzo_spec.info.title,
+        "Project 2 User API Testing"
+    );
     assert_eq!(project2.arazzo_spec.workflows.len(), 2);
     assert_eq!(project2.openapi_paths.len(), 1);
 }
@@ -47,7 +53,12 @@ fn test_project_metadata_openapi_detection() {
 
         for openapi_path in &project.openapi_paths {
             assert!(openapi_path.exists());
-            assert!(openapi_path.file_name().unwrap().to_str().unwrap().contains("openapi"));
+            assert!(openapi_path
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .contains("openapi"));
         }
     }
 }

@@ -1,11 +1,7 @@
 pub mod api;
 pub mod state;
 
-use axum::{
-    http::StatusCode,
-    routing::get,
-    Router,
-};
+use axum::{http::StatusCode, routing::get, Router};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use tower_http::cors::CorsLayer;

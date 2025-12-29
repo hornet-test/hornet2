@@ -7,7 +7,10 @@ pub async fn execute_serve(
     port: u16,
     default_project: Option<String>,
 ) -> Result<()> {
-    println!("{}", "Starting web server (multi-project mode)...".bright_blue());
+    println!(
+        "{}",
+        "Starting web server (multi-project mode)...".bright_blue()
+    );
     println!("  Root directory: {}", root_dir.display());
     println!("  Port: {}", port);
 
