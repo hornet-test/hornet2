@@ -250,7 +250,10 @@ export const EditorPage: React.FC = () => {
       {saveError && (
         <div className="save-error-banner">
           <span>⚠️ {saveError}</span>
-          <button className="error-close-btn" onClick={() => useEditorStore.setState({ saveError: null })}>
+          <button
+            className="error-close-btn"
+            onClick={() => useEditorStore.setState({ saveError: null })}
+          >
             ✕
           </button>
         </div>
