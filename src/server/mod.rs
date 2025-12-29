@@ -26,18 +26,20 @@ pub async fn start_server(
 
     // ルーターを構築
     let app = Router::new()
-        // API routes
-        .route("/api/spec", get(api::get_spec).put(api::update_spec))
-        // Visualization API routes
-        .route("/api/workflows", get(api::get_workflows))
+        // Arazzo Resource API - RESTful hierarchical design
+        .route("/api/arazzo", get(api::get_spec).put(api::update_spec))
         .route(
-            "/api/workflows/{workflow_id}",
+            "/api/arazzo/workflows",
+            get(api::get_workflows).post(api::create_workflow),
+        )
+        .route(
+            "/api/arazzo/workflows/{workflow_id}",
             get(api::get_workflow)
                 .put(api::update_workflow)
                 .delete(api::delete_workflow),
         )
-        .route("/api/graph/{workflow_id}", get(api::get_graph))
-        // Editor API routes
+        .route("/api/arazzo/graph/{workflow_id}", get(api::get_graph))
+        // Editor API
         .route("/api/editor/operations", get(api::get_operations))
         .route("/api/editor/validate", post(api::validate_arazzo))
         // Static files (CSS, JS) - from dist folder
@@ -153,11 +155,21 @@ cargo run -- serve --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/
     <div class="info">
         <h2>📡 API Endpoints</h2>
         <p>The following API endpoints are available:</p>
+        <h3>Arazzo Resource API</h3>
         <ul>
-            <li><code>GET/PUT /api/spec</code> - Get/Update full spec</li>
-            <li><code>GET /api/workflows</code> - List all workflows</li>
-            <li><code>GET/PUT/DELETE /api/workflows/{workflow_id}</code> - Manage workflows</li>
-            <li><code>GET /api/graph/{workflow_id}</code> - Get workflow graph</li>
+            <li><code>GET /api/arazzo</code> - Get full Arazzo specification</li>
+            <li><code>PUT /api/arazzo</code> - Update full Arazzo specification</li>
+            <li><code>GET /api/arazzo/workflows</code> - List all workflows</li>
+            <li><code>POST /api/arazzo/workflows</code> - Create new workflow</li>
+            <li><code>GET /api/arazzo/workflows/{id}</code> - Get specific workflow</li>
+            <li><code>PUT /api/arazzo/workflows/{id}</code> - Update specific workflow</li>
+            <li><code>DELETE /api/arazzo/workflows/{id}</code> - Delete specific workflow</li>
+            <li><code>GET /api/arazzo/graph/{id}</code> - Get workflow graph visualization</li>
+        </ul>
+        <h3>Editor API</h3>
+        <ul>
+            <li><code>GET /api/editor/operations</code> - Get OpenAPI operations</li>
+            <li><code>POST /api/editor/validate</code> - Validate Arazzo YAML</li>
         </ul>
     </div>
 </body>

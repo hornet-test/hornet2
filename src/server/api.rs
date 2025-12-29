@@ -1,6 +1,7 @@
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
+    http::{header, StatusCode},
+    response::{IntoResponse, Response},
     Json,
 };
 use serde::{Deserialize, Serialize};
@@ -18,12 +19,65 @@ pub struct AppState {
     pub openapi_path: Option<String>,
 }
 
-/// /api/workflows のレスポンス
+/// RFC 9457 Problem Details for HTTP APIs
+/// https://datatracker.ietf.org/doc/html/rfc9457
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProblemDetails {
+    /// A URI reference that identifies the problem type
+    #[serde(rename = "type")]
+    pub type_: String,
+    /// A short, human-readable summary of the problem type
+    pub title: String,
+    /// The HTTP status code
+    pub status: u16,
+    /// A human-readable explanation specific to this occurrence
+    pub detail: String,
+    /// A URI reference that identifies the specific occurrence of the problem
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub instance: Option<String>,
+}
+
+impl ProblemDetails {
+    fn new(status: StatusCode, type_suffix: &str, title: &str, detail: String) -> Self {
+        Self {
+            type_: format!("https://hornet2.dev/problems/{}", type_suffix),
+            title: title.to_string(),
+            status: status.as_u16(),
+            detail,
+            instance: None,
+        }
+    }
+
+    #[allow(dead_code)]
+    fn with_instance(mut self, instance: String) -> Self {
+        self.instance = Some(instance);
+        self
+    }
+}
+
+impl IntoResponse for ProblemDetails {
+    fn into_response(self) -> Response {
+        let status = StatusCode::from_u16(self.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+        let body = Json(self);
+        (
+            status,
+            [(header::CONTENT_TYPE, "application/problem+json")],
+            body,
+        )
+            .into_response()
+    }
+}
+
+/// エラーレスポンスを作成するヘルパー
+type ApiResult<T> = Result<T, ProblemDetails>;
+
+/// GET /api/arazzo/workflows のレスポンス
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WorkflowsResponse {
     pub workflows: Vec<WorkflowInfo>,
 }
 
+/// ワークフロー情報（一覧表示用）
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WorkflowInfo {
     pub workflow_id: String,
@@ -32,44 +86,51 @@ pub struct WorkflowInfo {
     pub steps: usize,
 }
 
-/// GET /api/spec - 完全なArazzo仕様を取得
-pub async fn get_spec(
-    State(state): State<AppState>,
-) -> Result<Json<ArazzoSpec>, (StatusCode, String)> {
+/// POST /api/arazzo/workflows のリクエスト
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateWorkflowRequest {
+    pub workflow: Workflow,
+}
+
+/// GET /api/arazzo - 完全なArazzo仕様を取得
+pub async fn get_spec(State(state): State<AppState>) -> ApiResult<Json<ArazzoSpec>> {
     let arazzo = loader::load_arazzo(&state.arazzo_path).map_err(|e| {
-        (
+        ProblemDetails::new(
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to load Arazzo: {}", e),
+            "load-failed",
+            "Failed to Load Resource",
+            format!("Failed to load Arazzo specification: {}", e),
         )
     })?;
 
     Ok(Json(arazzo))
 }
 
-/// PUT /api/spec - 完全なArazzo仕様を更新
+/// PUT /api/arazzo - 完全なArazzo仕様を更新
 pub async fn update_spec(
     State(state): State<AppState>,
     Json(spec): Json<ArazzoSpec>,
-) -> Result<Json<ArazzoSpec>, (StatusCode, String)> {
+) -> ApiResult<Json<ArazzoSpec>> {
     loader::save_arazzo(&state.arazzo_path, &spec).map_err(|e| {
-        (
+        ProblemDetails::new(
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to save Arazzo: {}", e),
+            "save-failed",
+            "Failed to Save Resource",
+            format!("Failed to save Arazzo specification: {}", e),
         )
     })?;
 
     Ok(Json(spec))
 }
 
-/// GET /api/workflows - すべてのワークフローをリスト
-pub async fn get_workflows(
-    State(state): State<AppState>,
-) -> Result<Json<WorkflowsResponse>, (StatusCode, String)> {
-    // Arazzoファイルをロード
+/// GET /api/arazzo/workflows - すべてのワークフローをリスト
+pub async fn get_workflows(State(state): State<AppState>) -> ApiResult<Json<WorkflowsResponse>> {
     let arazzo = loader::load_arazzo(&state.arazzo_path).map_err(|e| {
-        (
+        ProblemDetails::new(
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to load Arazzo: {}", e),
+            "load-failed",
+            "Failed to Load Resource",
+            format!("Failed to load Arazzo specification: {}", e),
         )
     })?;
 
@@ -87,15 +148,64 @@ pub async fn get_workflows(
     Ok(Json(WorkflowsResponse { workflows }))
 }
 
-/// GET /api/workflows/:workflow_id - 特定のワークフローを取得
+/// POST /api/arazzo/workflows - 新しいワークフローを作成
+pub async fn create_workflow(
+    State(state): State<AppState>,
+    Json(req): Json<CreateWorkflowRequest>,
+) -> ApiResult<(StatusCode, Json<Workflow>)> {
+    let mut arazzo = loader::load_arazzo(&state.arazzo_path).map_err(|e| {
+        ProblemDetails::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "load-failed",
+            "Failed to Load Resource",
+            format!("Failed to load Arazzo specification: {}", e),
+        )
+    })?;
+
+    // Check if workflow with same ID already exists
+    if arazzo
+        .workflows
+        .iter()
+        .any(|w| w.workflow_id == req.workflow.workflow_id)
+    {
+        return Err(ProblemDetails::new(
+            StatusCode::CONFLICT,
+            "workflow-exists",
+            "Resource Already Exists",
+            format!(
+                "Workflow with ID '{}' already exists",
+                req.workflow.workflow_id
+            ),
+        ));
+    }
+
+    // Add new workflow
+    arazzo.workflows.push(req.workflow.clone());
+
+    // Save updated spec
+    loader::save_arazzo(&state.arazzo_path, &arazzo).map_err(|e| {
+        ProblemDetails::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "save-failed",
+            "Failed to Save Resource",
+            format!("Failed to save Arazzo specification: {}", e),
+        )
+    })?;
+
+    Ok((StatusCode::CREATED, Json(req.workflow)))
+}
+
+/// GET /api/arazzo/workflows/{workflow_id} - 特定のワークフローを取得
 pub async fn get_workflow(
     State(state): State<AppState>,
     Path(workflow_id): Path<String>,
-) -> Result<Json<Workflow>, (StatusCode, String)> {
+) -> ApiResult<Json<Workflow>> {
     let arazzo = loader::load_arazzo(&state.arazzo_path).map_err(|e| {
-        (
+        ProblemDetails::new(
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to load Arazzo: {}", e),
+            "load-failed",
+            "Failed to Load Resource",
+            format!("Failed to load Arazzo specification: {}", e),
         )
     })?;
 
@@ -104,8 +214,10 @@ pub async fn get_workflow(
         .into_iter()
         .find(|w| w.workflow_id == workflow_id)
         .ok_or_else(|| {
-            (
+            ProblemDetails::new(
                 StatusCode::NOT_FOUND,
+                "workflow-not-found",
+                "Resource Not Found",
                 format!("Workflow '{}' not found", workflow_id),
             )
         })?;
@@ -113,60 +225,73 @@ pub async fn get_workflow(
     Ok(Json(workflow))
 }
 
-/// PUT /api/workflows/:workflow_id - ワークフローを更新または作成
+/// PUT /api/arazzo/workflows/{workflow_id} - ワークフローを更新
 pub async fn update_workflow(
     State(state): State<AppState>,
     Path(workflow_id): Path<String>,
     Json(workflow): Json<Workflow>,
-) -> Result<Json<Workflow>, (StatusCode, String)> {
+) -> ApiResult<Json<Workflow>> {
+    // Validate workflow ID matches path parameter
     if workflow.workflow_id != workflow_id {
-        return Err((
+        return Err(ProblemDetails::new(
             StatusCode::BAD_REQUEST,
+            "workflow-id-mismatch",
+            "Invalid Request",
             format!(
-                "Workflow ID mismatch: path={}, body={}",
+                "Workflow ID in path ({}) does not match workflow ID in body ({})",
                 workflow_id, workflow.workflow_id
             ),
         ));
     }
 
     let mut arazzo = loader::load_arazzo(&state.arazzo_path).map_err(|e| {
-        (
+        ProblemDetails::new(
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to load Arazzo: {}", e),
+            "load-failed",
+            "Failed to Load Resource",
+            format!("Failed to load Arazzo specification: {}", e),
         )
     })?;
 
-    if let Some(pos) = arazzo
+    // Find and update existing workflow
+    let pos = arazzo
         .workflows
         .iter()
         .position(|w| w.workflow_id == workflow_id)
-    {
-        // 既存のワークフローを更新
-        arazzo.workflows[pos] = workflow.clone();
-    } else {
-        // 新しいワークフローを追加
-        arazzo.workflows.push(workflow.clone());
-    }
+        .ok_or_else(|| {
+            ProblemDetails::new(
+                StatusCode::NOT_FOUND,
+                "workflow-not-found",
+                "Resource Not Found",
+                format!("Workflow '{}' not found", workflow_id),
+            )
+        })?;
+
+    arazzo.workflows[pos] = workflow.clone();
 
     loader::save_arazzo(&state.arazzo_path, &arazzo).map_err(|e| {
-        (
+        ProblemDetails::new(
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to save Arazzo: {}", e),
+            "save-failed",
+            "Failed to Save Resource",
+            format!("Failed to save Arazzo specification: {}", e),
         )
     })?;
 
     Ok(Json(workflow))
 }
 
-/// DELETE /api/workflows/:workflow_id - ワークフローを削除
+/// DELETE /api/arazzo/workflows/{workflow_id} - ワークフローを削除
 pub async fn delete_workflow(
     State(state): State<AppState>,
     Path(workflow_id): Path<String>,
-) -> Result<StatusCode, (StatusCode, String)> {
+) -> ApiResult<StatusCode> {
     let mut arazzo = loader::load_arazzo(&state.arazzo_path).map_err(|e| {
-        (
+        ProblemDetails::new(
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to load Arazzo: {}", e),
+            "load-failed",
+            "Failed to Load Resource",
+            format!("Failed to load Arazzo specification: {}", e),
         )
     })?;
 
@@ -174,72 +299,85 @@ pub async fn delete_workflow(
     arazzo.workflows.retain(|w| w.workflow_id != workflow_id);
 
     if arazzo.workflows.len() == initial_len {
-        return Err((
+        return Err(ProblemDetails::new(
             StatusCode::NOT_FOUND,
+            "workflow-not-found",
+            "Resource Not Found",
             format!("Workflow '{}' not found", workflow_id),
         ));
     }
 
     loader::save_arazzo(&state.arazzo_path, &arazzo).map_err(|e| {
-        (
+        ProblemDetails::new(
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to save Arazzo: {}", e),
+            "save-failed",
+            "Failed to Save Resource",
+            format!("Failed to save Arazzo specification: {}", e),
         )
     })?;
 
-    Ok(StatusCode::OK)
+    Ok(StatusCode::NO_CONTENT)
 }
 
-/// GET /api/graph/:workflow_id - 特定のワークフローのグラフを取得
+/// GET /api/arazzo/graph/{workflow_id} - 特定のワークフローのグラフを取得
 pub async fn get_graph(
     State(state): State<AppState>,
     Path(workflow_id): Path<String>,
-) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    // Arazzoファイルをロード
+) -> ApiResult<Json<serde_json::Value>> {
     let arazzo = loader::load_arazzo(&state.arazzo_path).map_err(|e| {
-        (
+        ProblemDetails::new(
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to load Arazzo: {}", e),
+            "load-failed",
+            "Failed to Load Resource",
+            format!("Failed to load Arazzo specification: {}", e),
         )
     })?;
 
-    // OpenAPIファイルが提供されている場合はロード
+    // Load OpenAPI file if provided
     let openapi = if let Some(ref path) = state.openapi_path {
         Some(loader::load_openapi(path).map_err(|e| {
-            (
+            ProblemDetails::new(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to load OpenAPI: {}", e),
+                "load-failed",
+                "Failed to Load Resource",
+                format!("Failed to load OpenAPI specification: {}", e),
             )
         })?)
     } else {
         None
     };
 
-    // ワークフローを検索
+    // Find workflow
     let workflow = arazzo
         .workflows
         .iter()
         .find(|w| w.workflow_id == workflow_id)
         .ok_or_else(|| {
-            (
+            ProblemDetails::new(
                 StatusCode::NOT_FOUND,
+                "workflow-not-found",
+                "Resource Not Found",
                 format!("Workflow '{}' not found", workflow_id),
             )
         })?;
 
-    // グラフを構築
+    // Build graph
     let graph = build_flow_graph(workflow, openapi.as_ref()).map_err(|e| {
-        (
+        ProblemDetails::new(
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to build graph: {}", e),
+            "graph-build-failed",
+            "Graph Build Failed",
+            format!("Failed to build workflow graph: {}", e),
         )
     })?;
 
-    // JSONにエクスポート
+    // Export to JSON
     let json = export_json(&graph).map_err(|e| {
-        (
+        ProblemDetails::new(
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to export graph: {}", e),
+            "graph-export-failed",
+            "Graph Export Failed",
+            format!("Failed to export graph to JSON: {}", e),
         )
     })?;
 

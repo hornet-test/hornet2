@@ -33,27 +33,30 @@ workflows:
         openapi_path: None,
     };
 
-    // Build app directly (bypassing start_server to avoid binding ports)
+    // Build app with new hierarchical API structure
     let app = axum::Router::new()
         .route(
-            "/api/spec",
+            "/api/arazzo",
             axum::routing::get(api::get_spec).put(api::update_spec),
         )
-        .route("/api/workflows", axum::routing::get(api::get_workflows))
         .route(
-            "/api/workflows/{workflow_id}",
+            "/api/arazzo/workflows",
+            axum::routing::get(api::get_workflows).post(api::create_workflow),
+        )
+        .route(
+            "/api/arazzo/workflows/{workflow_id}",
             axum::routing::get(api::get_workflow)
                 .put(api::update_workflow)
                 .delete(api::delete_workflow),
         )
         .with_state(state);
 
-    // 1. GET /api/spec
+    // 1. GET /api/arazzo - Get full specification
     let response = app
         .clone()
         .oneshot(
             Request::builder()
-                .uri("/api/spec")
+                .uri("/api/arazzo")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -67,12 +70,31 @@ workflows:
     let spec: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
     assert_eq!(spec["info"]["title"], "Test Workflow");
 
-    // 2. GET /api/workflows/test-flow
+    // 2. GET /api/arazzo/workflows - List all workflows
     let response = app
         .clone()
         .oneshot(
             Request::builder()
-                .uri("/api/workflows/test-flow")
+                .uri("/api/arazzo/workflows")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let workflows: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+    assert_eq!(workflows["workflows"][0]["workflow_id"], "test-flow");
+
+    // 3. GET /api/arazzo/workflows/test-flow - Get specific workflow
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/arazzo/workflows/test-flow")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -81,14 +103,47 @@ workflows:
 
     assert_eq!(response.status(), StatusCode::OK);
 
-    // 3. PUT /api/workflows/new-flow
-    let new_workflow = serde_json::json!({
-        "workflowId": "new-flow",
-        "summary": "New Workflow",
+    // 4. POST /api/arazzo/workflows - Create new workflow
+    let new_workflow_req = serde_json::json!({
+        "workflow": {
+            "workflowId": "new-flow",
+            "summary": "New Workflow",
+            "steps": [
+                {
+                    "stepId": "step1",
+                    "operationId": "someOp"
+                }
+            ]
+        }
+    });
+
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/arazzo/workflows")
+                .header("Content-Type", "application/json")
+                .body(Body::from(serde_json::to_vec(&new_workflow_req).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::CREATED);
+
+    // Verify it was written to file
+    let content = std::fs::read_to_string(&temp_path).unwrap();
+    assert!(content.contains("new-flow"));
+
+    // 5. PUT /api/arazzo/workflows/test-flow - Update workflow
+    let updated_workflow = serde_json::json!({
+        "workflowId": "test-flow",
+        "summary": "Updated Workflow",
         "steps": [
             {
                 "stepId": "step1",
-                "operationId": "someOp"
+                "operationId": "getTest"
             }
         ]
     });
@@ -98,9 +153,9 @@ workflows:
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri("/api/workflows/new-flow")
+                .uri("/api/arazzo/workflows/test-flow")
                 .header("Content-Type", "application/json")
-                .body(Body::from(serde_json::to_vec(&new_workflow).unwrap()))
+                .body(Body::from(serde_json::to_vec(&updated_workflow).unwrap()))
                 .unwrap(),
         )
         .await
@@ -108,24 +163,20 @@ workflows:
 
     assert_eq!(response.status(), StatusCode::OK);
 
-    // Verify it was written to file
-    let content = std::fs::read_to_string(&temp_path).unwrap();
-    assert!(content.contains("new-flow"));
-
-    // 4. DELETE /api/workflows/test-flow
+    // 6. DELETE /api/arazzo/workflows/test-flow
     let response = app
         .clone()
         .oneshot(
             Request::builder()
                 .method("DELETE")
-                .uri("/api/workflows/test-flow")
+                .uri("/api/arazzo/workflows/test-flow")
                 .body(Body::empty())
                 .unwrap(),
         )
         .await
         .unwrap();
 
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
 
     // Verify it was removed from file
     let content = std::fs::read_to_string(&temp_path).unwrap();

@@ -37,7 +37,7 @@ export const VisualizationPage: React.FC = () => {
   const fetchWorkflows = useCallback(async () => {
     try {
       setStatus({ message: 'Loading workflows...', type: 'info' });
-      const response = await fetch('/api/workflows');
+      const response = await fetch('/api/arazzo/workflows');
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       const data = (await response.json()) as { workflows?: WorkflowSummary[] };
       const newWorkflows = data.workflows ?? [];
@@ -62,7 +62,7 @@ export const VisualizationPage: React.FC = () => {
     if (!workflowId) return;
     try {
       setStatus({ message: `Loading graph for ${workflowId}...`, type: 'info' });
-      const response = await fetch(`/api/graph/${encodeURIComponent(workflowId)}`);
+      const response = await fetch(`/api/arazzo/graph/${encodeURIComponent(workflowId)}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       const data = (await response.json()) as GraphData;
       setGraph(data);

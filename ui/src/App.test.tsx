@@ -47,7 +47,7 @@ describe('App', () => {
     };
 
     const fetchMock = vi.fn<typeof fetch>((url) => {
-      if (url === '/api/workflows') {
+      if (url === '/api/arazzo/workflows') {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve(workflowsPayload),
@@ -56,7 +56,7 @@ describe('App', () => {
         }) as Promise<Response>;
       }
 
-      if (typeof url === 'string' && url.startsWith('/api/graph/')) {
+      if (typeof url === 'string' && url.startsWith('/api/arazzo/graph/')) {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve(graphPayload),
@@ -78,11 +78,11 @@ describe('App', () => {
   it('loads workflows and selects the first workflow automatically', async () => {
     render(<App />);
 
-    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledWith('/api/workflows'));
+    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledWith('/api/arazzo/workflows'));
     expect(await screen.findByText('wf-1 (2 steps)')).toBeInTheDocument();
     expect(screen.getByTestId('workflow-select')).toHaveValue('wf-1');
 
-    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledWith('/api/graph/wf-1'));
+    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledWith('/api/arazzo/graph/wf-1'));
     expect(screen.getByRole('status')).toHaveTextContent('Rendered 2 nodes and 1 edges');
   });
 
