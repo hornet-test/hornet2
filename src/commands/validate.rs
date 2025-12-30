@@ -3,6 +3,8 @@ use crate::{
     loader, HornetError, Result,
 };
 use colored::*;
+use std::collections::HashMap;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 pub fn execute_validate(
@@ -92,6 +94,52 @@ fn validate_files(openapi_path: &Path, arazzo_path: &Path) -> Result<()> {
         }
     };
 
+    // Validate Arazzo-OpenAPI consistency
+    if let (Some(ref arazzo), Some(ref openapi)) = (&arazzo, &openapi) {
+        println!(
+            "{}",
+            "Validating Arazzo-OpenAPI consistency...".bright_blue()
+        );
+
+        use crate::validation::ArazzoOpenApiValidator;
+
+        let validator = ArazzoOpenApiValidator::new(arazzo, openapi);
+
+        match validator.validate_all() {
+            Ok(result) => {
+                // Annotate errors and warnings with line numbers
+                let result = annotate_with_line_numbers(result, arazzo_path);
+
+                // Display errors
+                if !result.errors.is_empty() {
+                    println!("    {}", "✗ Consistency Errors:".red().bold());
+                    for error in &result.errors {
+                        println!("      - {}", error.format().red());
+                    }
+                    has_errors = true;
+                }
+
+                // Display warnings
+                if !result.warnings.is_empty() {
+                    println!("    {}", "⚠ Consistency Warnings:".yellow());
+                    for warning in &result.warnings {
+                        println!("      - {}", warning.format().yellow());
+                    }
+                }
+
+                if result.errors.is_empty() && result.warnings.is_empty() {
+                    println!("    {}", "✓ Consistency checks passed".green());
+                }
+            }
+            Err(e) => {
+                println!("    {}", "✗ Consistency validation failed".red().bold());
+                println!("      {}", e.to_string().red());
+                has_errors = true;
+            }
+        }
+        println!();
+    }
+
     // Validate workflows (graph structure)
     if let Some(arazzo) = arazzo {
         println!("{}", "Validating workflow graphs...".bright_blue());
@@ -145,4 +193,85 @@ fn validate_files(openapi_path: &Path, arazzo_path: &Path) -> Result<()> {
         println!("{}", "✓ All validations passed successfully".green().bold());
         Ok(())
     }
+}
+
+/// Build a map of workflow IDs and step IDs to their line numbers in the YAML file
+fn build_line_map(file_path: &Path) -> Result<HashMap<String, usize>> {
+    let content = fs::read_to_string(file_path)?;
+    let mut map = HashMap::new();
+
+    for (line_num, line) in content.lines().enumerate() {
+        let line_number = line_num + 1; // 1-indexed
+        let trimmed = line.trim();
+
+        // Match workflowId: value
+        if let Some(pos) = trimmed.find("workflowId:") {
+            if let Some(id) = trimmed[pos + 11..].trim().split('#').next() {
+                let id = id.trim();
+                if !id.is_empty() {
+                    map.insert(format!("workflow:{}", id), line_number);
+                }
+            }
+        }
+
+        // Match stepId: value
+        if let Some(pos) = trimmed.find("stepId:") {
+            if let Some(id) = trimmed[pos + 7..].trim().split('#').next() {
+                let id = id.trim();
+                if !id.is_empty() {
+                    map.insert(format!("step:{}", id), line_number);
+                }
+            }
+        }
+    }
+
+    Ok(map)
+}
+
+/// Annotate errors and warnings with line numbers from the Arazzo file
+fn annotate_with_line_numbers(
+    mut result: crate::validation::ConsistencyValidationResult,
+    arazzo_path: &Path,
+) -> crate::validation::ConsistencyValidationResult {
+    let line_map = match build_line_map(arazzo_path) {
+        Ok(map) => map,
+        Err(_) => return result, // If we can't read the file, just return as-is
+    };
+
+    let file_name = arazzo_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("arazzo.yaml");
+
+    // Annotate errors
+    for error in &mut result.errors {
+        if let Some(step_id) = &error.step_id {
+            if let Some(&line_num) = line_map.get(&format!("step:{}", step_id)) {
+                error.file_path = Some(file_name.to_string());
+                error.line_number = Some(line_num);
+            }
+        } else if let Some(workflow_id) = &error.workflow_id {
+            if let Some(&line_num) = line_map.get(&format!("workflow:{}", workflow_id)) {
+                error.file_path = Some(file_name.to_string());
+                error.line_number = Some(line_num);
+            }
+        }
+    }
+
+    // Annotate warnings
+    for warning in &mut result.warnings {
+        if let Some(step_id) = &warning.step_id {
+            if let Some(&line_num) = line_map.get(&format!("step:{}", step_id)) {
+                warning.file_path = Some(file_name.to_string());
+                warning.line_number = Some(line_num);
+            }
+        } else if let Some(workflow_id) = &warning.workflow_id {
+            if let Some(&line_num) = line_map.get(&format!("workflow:{}", workflow_id)) {
+                warning.file_path = Some(file_name.to_string());
+                warning.line_number = Some(line_num);
+            }
+        }
+    }
+
+    result
 }

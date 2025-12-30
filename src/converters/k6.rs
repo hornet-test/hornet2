@@ -625,7 +625,10 @@ impl K6Converter {
             visited.insert(step.step_id.clone());
 
             let response_var = format!("{}_response", step.step_id);
-            lines.push(format!("{}let {} = step_{}(inputs);", indent, response_var, step.step_id));
+            lines.push(format!(
+                "{}let {} = step_{}(inputs);",
+                indent, response_var, step.step_id
+            ));
 
             // Check for branching
             if step.on_success.is_some() || step.on_failure.is_some() {
@@ -634,7 +637,10 @@ impl K6Converter {
                     self.generate_success_condition(criteria, &response_var)
                 } else {
                     // Default: check status code 2xx
-                    format!("{}.status >= 200 && {}.status < 300", response_var, response_var)
+                    format!(
+                        "{}.status >= 200 && {}.status < 300",
+                        response_var, response_var
+                    )
                 };
 
                 lines.push(format!("{}if ({}) {{", indent, success_check));
@@ -651,7 +657,8 @@ impl K6Converter {
                                     ));
                                     // Find target step and generate its execution
                                     if let Some(target_step) = step_map.get(step_id_str) {
-                                        let target_response_var = format!("{}_response", target_step.step_id);
+                                        let target_response_var =
+                                            format!("{}_response", target_step.step_id);
                                         lines.push(format!(
                                             "{}  let {} = step_{}(inputs);",
                                             indent, target_response_var, target_step.step_id
@@ -679,10 +686,15 @@ impl K6Converter {
                                 // Generate condition for criteria
                                 let mut conditions = Vec::new();
                                 for crit_val in criteria_arr {
-                                    if let Some(context) = crit_val.get("context").and_then(|v| v.as_str()) {
-                                        if let Some(condition) = crit_val.get("condition").and_then(|v| v.as_str()) {
+                                    if let Some(context) =
+                                        crit_val.get("context").and_then(|v| v.as_str())
+                                    {
+                                        if let Some(condition) =
+                                            crit_val.get("condition").and_then(|v| v.as_str())
+                                        {
                                             if let Some(value) = crit_val.get("value") {
-                                                let left = self.convert_context_to_js(context, &response_var);
+                                                let left = self
+                                                    .convert_context_to_js(context, &response_var);
                                                 let operator = match condition {
                                                     "==" | "$eq" => "===",
                                                     "!=" | "$ne" => "!==",
@@ -693,14 +705,21 @@ impl K6Converter {
                                                     _ => "===",
                                                 };
                                                 let right = Self::json_to_js(value, 0);
-                                                conditions.push(format!("{} {} {}", left, operator, right));
+                                                conditions.push(format!(
+                                                    "{} {} {}",
+                                                    left, operator, right
+                                                ));
                                             }
                                         }
                                     }
                                 }
 
                                 if !conditions.is_empty() {
-                                    lines.push(format!("{}  if ({}) {{", indent, conditions.join(" && ")));
+                                    lines.push(format!(
+                                        "{}  if ({}) {{",
+                                        indent,
+                                        conditions.join(" && ")
+                                    ));
                                 }
                             }
                         }
@@ -714,7 +733,8 @@ impl K6Converter {
                                     ));
                                     // Find target step and generate its execution
                                     if let Some(target_step) = step_map.get(step_id_str) {
-                                        let target_response_var = format!("{}_response", target_step.step_id);
+                                        let target_response_var =
+                                            format!("{}_response", target_step.step_id);
                                         lines.push(format!(
                                             "{}    let {} = step_{}(inputs);",
                                             indent, target_response_var, target_step.step_id
@@ -727,13 +747,16 @@ impl K6Converter {
                         }
 
                         // Close criteria if block
-                        if action.config.get("criteria").is_some() {
+                        if action.config.contains_key("criteria") {
                             lines.push(format!("{}  }}", indent));
                         }
                     }
                 } else {
                     // No onFailure action, just log and continue
-                    lines.push(format!("{}  console.error('Step {} failed');", indent, step.step_id));
+                    lines.push(format!(
+                        "{}  console.error('Step {} failed');",
+                        indent, step.step_id
+                    ));
                 }
 
                 lines.push(format!("{}}}", indent));
@@ -771,7 +794,10 @@ impl K6Converter {
 
             let response_var = format!("{}_response", step.step_id);
             let step_func = format!("{}__step_{}", func_prefix, step.step_id);
-            lines.push(format!("{}let {} = {}(inputs);", indent, response_var, step_func));
+            lines.push(format!(
+                "{}let {} = {}(inputs);",
+                indent, response_var, step_func
+            ));
 
             // Check for branching
             if step.on_success.is_some() || step.on_failure.is_some() {
@@ -780,7 +806,10 @@ impl K6Converter {
                     self.generate_success_condition(criteria, &response_var)
                 } else {
                     // Default: check status code 2xx
-                    format!("{}.status >= 200 && {}.status < 300", response_var, response_var)
+                    format!(
+                        "{}.status >= 200 && {}.status < 300",
+                        response_var, response_var
+                    )
                 };
 
                 lines.push(format!("{}if ({}) {{", indent, success_check));
@@ -797,8 +826,12 @@ impl K6Converter {
                                     ));
                                     // Find target step and generate its execution
                                     if let Some(target_step) = step_map.get(step_id_str) {
-                                        let target_response_var = format!("{}_response", target_step.step_id);
-                                        let target_func = format!("{}__step_{}", func_prefix, target_step.step_id);
+                                        let target_response_var =
+                                            format!("{}_response", target_step.step_id);
+                                        let target_func = format!(
+                                            "{}__step_{}",
+                                            func_prefix, target_step.step_id
+                                        );
                                         lines.push(format!(
                                             "{}  let {} = {}(inputs);",
                                             indent, target_response_var, target_func
@@ -826,10 +859,15 @@ impl K6Converter {
                                 // Generate condition for criteria
                                 let mut conditions = Vec::new();
                                 for crit_val in criteria_arr {
-                                    if let Some(context) = crit_val.get("context").and_then(|v| v.as_str()) {
-                                        if let Some(condition) = crit_val.get("condition").and_then(|v| v.as_str()) {
+                                    if let Some(context) =
+                                        crit_val.get("context").and_then(|v| v.as_str())
+                                    {
+                                        if let Some(condition) =
+                                            crit_val.get("condition").and_then(|v| v.as_str())
+                                        {
                                             if let Some(value) = crit_val.get("value") {
-                                                let left = self.convert_context_to_js(context, &response_var);
+                                                let left = self
+                                                    .convert_context_to_js(context, &response_var);
                                                 let operator = match condition {
                                                     "==" | "$eq" => "===",
                                                     "!=" | "$ne" => "!==",
@@ -840,14 +878,21 @@ impl K6Converter {
                                                     _ => "===",
                                                 };
                                                 let right = Self::json_to_js(value, 0);
-                                                conditions.push(format!("{} {} {}", left, operator, right));
+                                                conditions.push(format!(
+                                                    "{} {} {}",
+                                                    left, operator, right
+                                                ));
                                             }
                                         }
                                     }
                                 }
 
                                 if !conditions.is_empty() {
-                                    lines.push(format!("{}  if ({}) {{", indent, conditions.join(" && ")));
+                                    lines.push(format!(
+                                        "{}  if ({}) {{",
+                                        indent,
+                                        conditions.join(" && ")
+                                    ));
                                 }
                             }
                         }
@@ -861,8 +906,12 @@ impl K6Converter {
                                     ));
                                     // Find target step and generate its execution
                                     if let Some(target_step) = step_map.get(step_id_str) {
-                                        let target_response_var = format!("{}_response", target_step.step_id);
-                                        let target_func = format!("{}__step_{}", func_prefix, target_step.step_id);
+                                        let target_response_var =
+                                            format!("{}_response", target_step.step_id);
+                                        let target_func = format!(
+                                            "{}__step_{}",
+                                            func_prefix, target_step.step_id
+                                        );
                                         lines.push(format!(
                                             "{}    let {} = {}(inputs);",
                                             indent, target_response_var, target_func
@@ -875,13 +924,16 @@ impl K6Converter {
                         }
 
                         // Close criteria if block
-                        if action.config.get("criteria").is_some() {
+                        if action.config.contains_key("criteria") {
                             lines.push(format!("{}  }}", indent));
                         }
                     }
                 } else {
                     // No onFailure action, just log and continue
-                    lines.push(format!("{}  console.error('Step {} failed');", indent, step.step_id));
+                    lines.push(format!(
+                        "{}  console.error('Step {} failed');",
+                        indent, step.step_id
+                    ));
                 }
 
                 lines.push(format!("{}}}", indent));
@@ -897,7 +949,11 @@ impl K6Converter {
     }
 
     /// Generate success condition from criteria
-    fn generate_success_condition(&self, criteria: &[SuccessCriteria], response_var: &str) -> String {
+    fn generate_success_condition(
+        &self,
+        criteria: &[SuccessCriteria],
+        response_var: &str,
+    ) -> String {
         let mut conditions = Vec::new();
 
         for crit in criteria {
@@ -1038,7 +1094,12 @@ impl Converter for K6Converter {
                 lines.push(inputs);
 
                 // Generate control flow
-                let control_flow = self.generate_control_flow_for_multi(&workflow.steps, &step_map, &func_name, "  ")?;
+                let control_flow = self.generate_control_flow_for_multi(
+                    &workflow.steps,
+                    &step_map,
+                    &func_name,
+                    "  ",
+                )?;
                 lines.push(control_flow);
 
                 lines.push("}".to_string());

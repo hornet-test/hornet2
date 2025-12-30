@@ -8,7 +8,7 @@ use crate::{
     loader, HornetError, Result,
 };
 use colored::*;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub fn execute_visualize(
     root_dir: &Option<PathBuf>,
@@ -51,7 +51,7 @@ pub fn execute_visualize(
 }
 
 fn visualize_workflow(
-    arazzo_path: &PathBuf,
+    arazzo_path: &Path,
     openapi_path: &Option<PathBuf>,
     format: &OutputFormat,
     output_path: &Option<PathBuf>,
