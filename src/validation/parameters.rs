@@ -2,8 +2,8 @@ use super::operations::OperationValidator;
 use super::{ErrorType, ValidationError, ValidationWarning};
 use crate::error::Result;
 use crate::models::arazzo::ArazzoSpec;
-use oas3::spec::ObjectOrReference;
 use oas3::OpenApiV3Spec;
+use oas3::spec::ObjectOrReference;
 
 /// Validator for parameter compatibility
 pub struct ParameterValidator<'a> {
@@ -94,9 +94,9 @@ impl<'a> ParameterValidator<'a> {
                 for step_param in &step.parameters {
                     if let Some(openapi_param) =
                         openapi_params.iter().find(|p| p.name == step_param.name)
+                        && openapi_param.location != step_param.location
                     {
-                        if openapi_param.location != step_param.location {
-                            errors.push(
+                        errors.push(
                                 ValidationError::new(
                                     ErrorType::ParameterLocationMismatch,
                                     format!(
@@ -107,7 +107,6 @@ impl<'a> ParameterValidator<'a> {
                                 .with_workflow(&workflow.workflow_id)
                                 .with_step(&step.step_id),
                             );
-                        }
                     }
                 }
             }

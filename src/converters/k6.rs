@@ -44,12 +44,11 @@ impl K6Converter {
                 ];
 
                 for (method, op_opt) in operations.iter() {
-                    if let Some(op) = op_opt {
-                        if let Some(ref op_id) = op.operation_id {
-                            if op_id == operation_id {
-                                return Some((path.clone(), method.to_string()));
-                            }
-                        }
+                    if let Some(op) = op_opt
+                        && let Some(ref op_id) = op.operation_id
+                        && op_id == operation_id
+                    {
+                        return Some((path.clone(), method.to_string()));
                     }
                 }
             }
@@ -649,21 +648,21 @@ impl K6Converter {
                 if let Some(ref actions) = step.on_success {
                     for action in actions {
                         if action.action_type == "goto" {
-                            if let Some(step_id) = action.config.get("stepId") {
-                                if let Some(step_id_str) = step_id.as_str() {
+                            if let Some(step_id) = action.config.get("stepId")
+                                && let Some(step_id_str) = step_id.as_str()
+                            {
+                                lines.push(format!(
+                                    "{}  // onSuccess: goto {}",
+                                    indent, step_id_str
+                                ));
+                                // Find target step and generate its execution
+                                if let Some(target_step) = step_map.get(step_id_str) {
+                                    let target_response_var =
+                                        format!("{}_response", target_step.step_id);
                                     lines.push(format!(
-                                        "{}  // onSuccess: goto {}",
-                                        indent, step_id_str
+                                        "{}  let {} = step_{}(inputs);",
+                                        indent, target_response_var, target_step.step_id
                                     ));
-                                    // Find target step and generate its execution
-                                    if let Some(target_step) = step_map.get(step_id_str) {
-                                        let target_response_var =
-                                            format!("{}_response", target_step.step_id);
-                                        lines.push(format!(
-                                            "{}  let {} = step_{}(inputs);",
-                                            indent, target_response_var, target_step.step_id
-                                        ));
-                                    }
                                 }
                             }
                         } else if action.action_type == "end" {
@@ -681,65 +680,58 @@ impl K6Converter {
                 if let Some(ref actions) = step.on_failure {
                     for action in actions {
                         // Check if action has specific criteria
-                        if let Some(criteria_val) = action.config.get("criteria") {
-                            if let Some(criteria_arr) = criteria_val.as_array() {
-                                // Generate condition for criteria
-                                let mut conditions = Vec::new();
-                                for crit_val in criteria_arr {
-                                    if let Some(context) =
-                                        crit_val.get("context").and_then(|v| v.as_str())
-                                    {
-                                        if let Some(condition) =
-                                            crit_val.get("condition").and_then(|v| v.as_str())
-                                        {
-                                            if let Some(value) = crit_val.get("value") {
-                                                let left = self
-                                                    .convert_context_to_js(context, &response_var);
-                                                let operator = match condition {
-                                                    "==" | "$eq" => "===",
-                                                    "!=" | "$ne" => "!==",
-                                                    ">" | "$gt" => ">",
-                                                    ">=" | "$gte" => ">=",
-                                                    "<" | "$lt" => "<",
-                                                    "<=" | "$lte" => "<=",
-                                                    _ => "===",
-                                                };
-                                                let right = Self::json_to_js(value, 0);
-                                                conditions.push(format!(
-                                                    "{} {} {}",
-                                                    left, operator, right
-                                                ));
-                                            }
-                                        }
-                                    }
+                        if let Some(criteria_val) = action.config.get("criteria")
+                            && let Some(criteria_arr) = criteria_val.as_array()
+                        {
+                            // Generate condition for criteria
+                            let mut conditions = Vec::new();
+                            for crit_val in criteria_arr {
+                                if let Some(context) =
+                                    crit_val.get("context").and_then(|v| v.as_str())
+                                    && let Some(condition) =
+                                        crit_val.get("condition").and_then(|v| v.as_str())
+                                    && let Some(value) = crit_val.get("value")
+                                {
+                                    let left = self.convert_context_to_js(context, &response_var);
+                                    let operator = match condition {
+                                        "==" | "$eq" => "===",
+                                        "!=" | "$ne" => "!==",
+                                        ">" | "$gt" => ">",
+                                        ">=" | "$gte" => ">=",
+                                        "<" | "$lt" => "<",
+                                        "<=" | "$lte" => "<=",
+                                        _ => "===",
+                                    };
+                                    let right = Self::json_to_js(value, 0);
+                                    conditions.push(format!("{} {} {}", left, operator, right));
                                 }
+                            }
 
-                                if !conditions.is_empty() {
-                                    lines.push(format!(
-                                        "{}  if ({}) {{",
-                                        indent,
-                                        conditions.join(" && ")
-                                    ));
-                                }
+                            if !conditions.is_empty() {
+                                lines.push(format!(
+                                    "{}  if ({}) {{",
+                                    indent,
+                                    conditions.join(" && ")
+                                ));
                             }
                         }
 
                         if action.action_type == "goto" {
-                            if let Some(step_id) = action.config.get("stepId") {
-                                if let Some(step_id_str) = step_id.as_str() {
+                            if let Some(step_id) = action.config.get("stepId")
+                                && let Some(step_id_str) = step_id.as_str()
+                            {
+                                lines.push(format!(
+                                    "{}    // onFailure: goto {}",
+                                    indent, step_id_str
+                                ));
+                                // Find target step and generate its execution
+                                if let Some(target_step) = step_map.get(step_id_str) {
+                                    let target_response_var =
+                                        format!("{}_response", target_step.step_id);
                                     lines.push(format!(
-                                        "{}    // onFailure: goto {}",
-                                        indent, step_id_str
+                                        "{}    let {} = step_{}(inputs);",
+                                        indent, target_response_var, target_step.step_id
                                     ));
-                                    // Find target step and generate its execution
-                                    if let Some(target_step) = step_map.get(step_id_str) {
-                                        let target_response_var =
-                                            format!("{}_response", target_step.step_id);
-                                        lines.push(format!(
-                                            "{}    let {} = step_{}(inputs);",
-                                            indent, target_response_var, target_step.step_id
-                                        ));
-                                    }
                                 }
                             }
                         } else if action.action_type == "end" {
@@ -818,25 +810,23 @@ impl K6Converter {
                 if let Some(ref actions) = step.on_success {
                     for action in actions {
                         if action.action_type == "goto" {
-                            if let Some(step_id) = action.config.get("stepId") {
-                                if let Some(step_id_str) = step_id.as_str() {
+                            if let Some(step_id) = action.config.get("stepId")
+                                && let Some(step_id_str) = step_id.as_str()
+                            {
+                                lines.push(format!(
+                                    "{}  // onSuccess: goto {}",
+                                    indent, step_id_str
+                                ));
+                                // Find target step and generate its execution
+                                if let Some(target_step) = step_map.get(step_id_str) {
+                                    let target_response_var =
+                                        format!("{}_response", target_step.step_id);
+                                    let target_func =
+                                        format!("{}__step_{}", func_prefix, target_step.step_id);
                                     lines.push(format!(
-                                        "{}  // onSuccess: goto {}",
-                                        indent, step_id_str
+                                        "{}  let {} = {}(inputs);",
+                                        indent, target_response_var, target_func
                                     ));
-                                    // Find target step and generate its execution
-                                    if let Some(target_step) = step_map.get(step_id_str) {
-                                        let target_response_var =
-                                            format!("{}_response", target_step.step_id);
-                                        let target_func = format!(
-                                            "{}__step_{}",
-                                            func_prefix, target_step.step_id
-                                        );
-                                        lines.push(format!(
-                                            "{}  let {} = {}(inputs);",
-                                            indent, target_response_var, target_func
-                                        ));
-                                    }
                                 }
                             }
                         } else if action.action_type == "end" {
@@ -854,69 +844,60 @@ impl K6Converter {
                 if let Some(ref actions) = step.on_failure {
                     for action in actions {
                         // Check if action has specific criteria
-                        if let Some(criteria_val) = action.config.get("criteria") {
-                            if let Some(criteria_arr) = criteria_val.as_array() {
-                                // Generate condition for criteria
-                                let mut conditions = Vec::new();
-                                for crit_val in criteria_arr {
-                                    if let Some(context) =
-                                        crit_val.get("context").and_then(|v| v.as_str())
-                                    {
-                                        if let Some(condition) =
-                                            crit_val.get("condition").and_then(|v| v.as_str())
-                                        {
-                                            if let Some(value) = crit_val.get("value") {
-                                                let left = self
-                                                    .convert_context_to_js(context, &response_var);
-                                                let operator = match condition {
-                                                    "==" | "$eq" => "===",
-                                                    "!=" | "$ne" => "!==",
-                                                    ">" | "$gt" => ">",
-                                                    ">=" | "$gte" => ">=",
-                                                    "<" | "$lt" => "<",
-                                                    "<=" | "$lte" => "<=",
-                                                    _ => "===",
-                                                };
-                                                let right = Self::json_to_js(value, 0);
-                                                conditions.push(format!(
-                                                    "{} {} {}",
-                                                    left, operator, right
-                                                ));
-                                            }
-                                        }
-                                    }
+                        if let Some(criteria_val) = action.config.get("criteria")
+                            && let Some(criteria_arr) = criteria_val.as_array()
+                        {
+                            // Generate condition for criteria
+                            let mut conditions = Vec::new();
+                            for crit_val in criteria_arr {
+                                if let Some(context) =
+                                    crit_val.get("context").and_then(|v| v.as_str())
+                                    && let Some(condition) =
+                                        crit_val.get("condition").and_then(|v| v.as_str())
+                                    && let Some(value) = crit_val.get("value")
+                                {
+                                    let left = self.convert_context_to_js(context, &response_var);
+                                    let operator = match condition {
+                                        "==" | "$eq" => "===",
+                                        "!=" | "$ne" => "!==",
+                                        ">" | "$gt" => ">",
+                                        ">=" | "$gte" => ">=",
+                                        "<" | "$lt" => "<",
+                                        "<=" | "$lte" => "<=",
+                                        _ => "===",
+                                    };
+                                    let right = Self::json_to_js(value, 0);
+                                    conditions.push(format!("{} {} {}", left, operator, right));
                                 }
+                            }
 
-                                if !conditions.is_empty() {
-                                    lines.push(format!(
-                                        "{}  if ({}) {{",
-                                        indent,
-                                        conditions.join(" && ")
-                                    ));
-                                }
+                            if !conditions.is_empty() {
+                                lines.push(format!(
+                                    "{}  if ({}) {{",
+                                    indent,
+                                    conditions.join(" && ")
+                                ));
                             }
                         }
 
                         if action.action_type == "goto" {
-                            if let Some(step_id) = action.config.get("stepId") {
-                                if let Some(step_id_str) = step_id.as_str() {
+                            if let Some(step_id) = action.config.get("stepId")
+                                && let Some(step_id_str) = step_id.as_str()
+                            {
+                                lines.push(format!(
+                                    "{}    // onFailure: goto {}",
+                                    indent, step_id_str
+                                ));
+                                // Find target step and generate its execution
+                                if let Some(target_step) = step_map.get(step_id_str) {
+                                    let target_response_var =
+                                        format!("{}_response", target_step.step_id);
+                                    let target_func =
+                                        format!("{}__step_{}", func_prefix, target_step.step_id);
                                     lines.push(format!(
-                                        "{}    // onFailure: goto {}",
-                                        indent, step_id_str
+                                        "{}    let {} = {}(inputs);",
+                                        indent, target_response_var, target_func
                                     ));
-                                    // Find target step and generate its execution
-                                    if let Some(target_step) = step_map.get(step_id_str) {
-                                        let target_response_var =
-                                            format!("{}_response", target_step.step_id);
-                                        let target_func = format!(
-                                            "{}__step_{}",
-                                            func_prefix, target_step.step_id
-                                        );
-                                        lines.push(format!(
-                                            "{}    let {} = {}(inputs);",
-                                            indent, target_response_var, target_func
-                                        ));
-                                    }
                                 }
                             }
                         } else if action.action_type == "end" {

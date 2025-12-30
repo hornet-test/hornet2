@@ -1,8 +1,8 @@
 use super::{ErrorType, ValidationError, ValidationWarning};
 use crate::error::Result;
 use crate::models::arazzo::{ArazzoSpec, Step};
-use oas3::spec::Operation;
 use oas3::OpenApiV3Spec;
+use oas3::spec::Operation;
 use std::collections::HashMap;
 
 /// Validator for operation references
@@ -36,9 +36,10 @@ impl<'a> OperationValidator<'a> {
         for workflow in &self.arazzo.workflows {
             for step in &workflow.steps {
                 // Check operationId reference
-                if let Some(op_id) = &step.operation_id {
-                    if !op_cache.contains_key(op_id.as_str()) {
-                        errors.push(
+                if let Some(op_id) = &step.operation_id
+                    && !op_cache.contains_key(op_id.as_str())
+                {
+                    errors.push(
                             ValidationError::new(
                                 ErrorType::OperationIdNotFound,
                                 format!("Operation not found: operationId '{}' does not exist in OpenAPI spec", op_id),
@@ -46,13 +47,13 @@ impl<'a> OperationValidator<'a> {
                             .with_workflow(&workflow.workflow_id)
                             .with_step(&step.step_id),
                         );
-                    }
                 }
 
                 // Check operationPath reference
-                if let Some(op_path) = &step.operation_path {
-                    if !self.find_operation_by_path(op_path) {
-                        errors.push(
+                if let Some(op_path) = &step.operation_path
+                    && !self.find_operation_by_path(op_path)
+                {
+                    errors.push(
                             ValidationError::new(
                                 ErrorType::OperationPathNotFound,
                                 format!("Operation not found: operationPath '{}' does not exist in OpenAPI spec", op_path),
@@ -60,13 +61,13 @@ impl<'a> OperationValidator<'a> {
                             .with_workflow(&workflow.workflow_id)
                             .with_step(&step.step_id),
                         );
-                    }
                 }
 
                 // Check workflowId reference
-                if let Some(wf_id) = &step.workflow_id {
-                    if !workflow_ids.contains(wf_id) {
-                        errors.push(
+                if let Some(wf_id) = &step.workflow_id
+                    && !workflow_ids.contains(wf_id)
+                {
+                    errors.push(
                             ValidationError::new(
                                 ErrorType::WorkflowRefNotFound,
                                 format!("Workflow reference not found: workflowId '{}' does not exist in Arazzo spec", wf_id),
@@ -74,7 +75,6 @@ impl<'a> OperationValidator<'a> {
                             .with_workflow(&workflow.workflow_id)
                             .with_step(&step.step_id),
                         );
-                    }
                 }
             }
         }
@@ -122,22 +122,22 @@ impl<'a> OperationValidator<'a> {
         let method = parts[0].to_uppercase();
         let path = parts[1];
 
-        if let Some(paths) = &self.openapi.paths {
-            if let Some(path_item) = paths.get(path) {
-                let op_option = match method.as_str() {
-                    "GET" => &path_item.get,
-                    "POST" => &path_item.post,
-                    "PUT" => &path_item.put,
-                    "DELETE" => &path_item.delete,
-                    "PATCH" => &path_item.patch,
-                    "OPTIONS" => &path_item.options,
-                    "HEAD" => &path_item.head,
-                    "TRACE" => &path_item.trace,
-                    _ => &None,
-                };
+        if let Some(paths) = &self.openapi.paths
+            && let Some(path_item) = paths.get(path)
+        {
+            let op_option = match method.as_str() {
+                "GET" => &path_item.get,
+                "POST" => &path_item.post,
+                "PUT" => &path_item.put,
+                "DELETE" => &path_item.delete,
+                "PATCH" => &path_item.patch,
+                "OPTIONS" => &path_item.options,
+                "HEAD" => &path_item.head,
+                "TRACE" => &path_item.trace,
+                _ => &None,
+            };
 
-                return op_option.is_some();
-            }
+            return op_option.is_some();
         }
 
         false
@@ -159,22 +159,22 @@ impl<'a> OperationValidator<'a> {
         let method = parts[0].to_uppercase();
         let path = parts[1];
 
-        if let Some(paths) = &self.openapi.paths {
-            if let Some(path_item) = paths.get(path) {
-                let op_option = match method.as_str() {
-                    "GET" => &path_item.get,
-                    "POST" => &path_item.post,
-                    "PUT" => &path_item.put,
-                    "DELETE" => &path_item.delete,
-                    "PATCH" => &path_item.patch,
-                    "OPTIONS" => &path_item.options,
-                    "HEAD" => &path_item.head,
-                    "TRACE" => &path_item.trace,
-                    _ => &None,
-                };
+        if let Some(paths) = &self.openapi.paths
+            && let Some(path_item) = paths.get(path)
+        {
+            let op_option = match method.as_str() {
+                "GET" => &path_item.get,
+                "POST" => &path_item.post,
+                "PUT" => &path_item.put,
+                "DELETE" => &path_item.delete,
+                "PATCH" => &path_item.patch,
+                "OPTIONS" => &path_item.options,
+                "HEAD" => &path_item.head,
+                "TRACE" => &path_item.trace,
+                _ => &None,
+            };
 
-                return op_option.as_ref().map(|op| (*op).clone());
-            }
+            return op_option.as_ref().map(|op| (*op).clone());
         }
 
         None

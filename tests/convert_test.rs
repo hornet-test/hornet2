@@ -1,4 +1,4 @@
-use hornet2::commands::{execute_convert, ConvertCommandArgs};
+use hornet2::commands::{ConvertCommandArgs, execute_convert};
 use std::path::Path;
 
 #[test]

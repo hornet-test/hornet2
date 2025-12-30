@@ -1,6 +1,6 @@
 use crate::error::Result;
-use oas3::spec::Operation;
 use oas3::OpenApiV3Spec;
+use oas3::spec::Operation;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -66,14 +66,14 @@ impl OpenApiResolver {
                     ];
 
                     for (method, op_option) in &operations {
-                        if let Some(op) = op_option {
-                            if op.operation_id.as_deref() == Some(operation_id) {
-                                return Some(OperationRef {
-                                    source_name: source_name.clone(),
-                                    method: method.to_string(),
-                                    path: path.clone(),
-                                });
-                            }
+                        if let Some(op) = op_option
+                            && op.operation_id.as_deref() == Some(operation_id)
+                        {
+                            return Some(OperationRef {
+                                source_name: source_name.clone(),
+                                method: method.to_string(),
+                                path: path.clone(),
+                            });
                         }
                     }
                 }
@@ -103,15 +103,15 @@ impl OpenApiResolver {
                     ];
 
                     for (method, op_option) in &operations {
-                        if let Some(op) = op_option {
-                            if op.operation_id.as_deref() == Some(operation_id) {
-                                let op_ref = OperationRef {
-                                    source_name: source_name.clone(),
-                                    method: method.to_string(),
-                                    path: path.clone(),
-                                };
-                                return Some((op_ref, (*op).clone()));
-                            }
+                        if let Some(op) = op_option
+                            && op.operation_id.as_deref() == Some(operation_id)
+                        {
+                            let op_ref = OperationRef {
+                                source_name: source_name.clone(),
+                                method: method.to_string(),
+                                path: path.clone(),
+                            };
+                            return Some((op_ref, (*op).clone()));
                         }
                     }
                 }
@@ -129,28 +129,28 @@ impl OpenApiResolver {
         let method_upper = method.to_uppercase();
 
         for (source_name, spec) in &self.specs {
-            if let Some(paths) = &spec.paths {
-                if let Some(path_item) = paths.get(operation_path) {
-                    let op_option = match method_upper.as_str() {
-                        "GET" => &path_item.get,
-                        "POST" => &path_item.post,
-                        "PUT" => &path_item.put,
-                        "DELETE" => &path_item.delete,
-                        "PATCH" => &path_item.patch,
-                        "OPTIONS" => &path_item.options,
-                        "HEAD" => &path_item.head,
-                        "TRACE" => &path_item.trace,
-                        _ => &None,
-                    };
+            if let Some(paths) = &spec.paths
+                && let Some(path_item) = paths.get(operation_path)
+            {
+                let op_option = match method_upper.as_str() {
+                    "GET" => &path_item.get,
+                    "POST" => &path_item.post,
+                    "PUT" => &path_item.put,
+                    "DELETE" => &path_item.delete,
+                    "PATCH" => &path_item.patch,
+                    "OPTIONS" => &path_item.options,
+                    "HEAD" => &path_item.head,
+                    "TRACE" => &path_item.trace,
+                    _ => &None,
+                };
 
-                    if let Some(op) = op_option {
-                        let op_ref = OperationRef {
-                            source_name: source_name.clone(),
-                            method: method_upper,
-                            path: operation_path.to_string(),
-                        };
-                        return Some((op_ref, op.clone()));
-                    }
+                if let Some(op) = op_option {
+                    let op_ref = OperationRef {
+                        source_name: source_name.clone(),
+                        method: method_upper,
+                        path: operation_path.to_string(),
+                    };
+                    return Some((op_ref, op.clone()));
                 }
             }
         }

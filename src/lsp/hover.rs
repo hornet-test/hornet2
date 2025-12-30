@@ -77,29 +77,28 @@ pub fn provide_hover(
         }
         IdentifierKind::WorkflowId(workflow_id) => {
             // Find project and workflow details
-            if let Some(project) = workspace_manager.find_project_for_file(uri) {
-                if let Some(workflow) = project
+            if let Some(project) = workspace_manager.find_project_for_file(uri)
+                && let Some(workflow) = project
                     .arazzo_spec
                     .workflows
                     .iter()
                     .find(|w| w.workflow_id == *workflow_id)
-                {
-                    let mut markdown = format!("**Workflow**: `{}`\n\n", workflow_id);
+            {
+                let mut markdown = format!("**Workflow**: `{}`\n\n", workflow_id);
 
-                    if let Some(ref description) = workflow.description {
-                        markdown.push_str(&format!("{}\n\n", description));
-                    }
-
-                    markdown.push_str(&format!("**Steps**: {}", workflow.steps.len()));
-
-                    return Ok(Some(Hover {
-                        contents: HoverContents::Markup(MarkupContent {
-                            kind: MarkupKind::Markdown,
-                            value: markdown,
-                        }),
-                        range: Some(identifier.range),
-                    }));
+                if let Some(ref description) = workflow.description {
+                    markdown.push_str(&format!("{}\n\n", description));
                 }
+
+                markdown.push_str(&format!("**Steps**: {}", workflow.steps.len()));
+
+                return Ok(Some(Hover {
+                    contents: HoverContents::Markup(MarkupContent {
+                        kind: MarkupKind::Markdown,
+                        value: markdown,
+                    }),
+                    range: Some(identifier.range),
+                }));
             }
 
             Ok(None)

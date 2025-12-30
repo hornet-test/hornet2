@@ -1,4 +1,4 @@
-use crate::{server, Result};
+use crate::{Result, server};
 use colored::*;
 use std::path::Path;
 

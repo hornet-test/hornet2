@@ -44,16 +44,16 @@ fn error_to_range(error: &ValidationError, position_map: &PositionMap) -> Range 
     }
 
     // Try to find range from position map
-    if let (Some(workflow_id), Some(step_id)) = (&error.workflow_id, &error.step_id) {
-        if let Some(range) = position_map.get_step_range(workflow_id, step_id) {
-            return range;
-        }
+    if let (Some(workflow_id), Some(step_id)) = (&error.workflow_id, &error.step_id)
+        && let Some(range) = position_map.get_step_range(workflow_id, step_id)
+    {
+        return range;
     }
 
-    if let Some(workflow_id) = &error.workflow_id {
-        if let Some(range) = position_map.get_workflow_range(workflow_id) {
-            return range;
-        }
+    if let Some(workflow_id) = &error.workflow_id
+        && let Some(range) = position_map.get_workflow_range(workflow_id)
+    {
+        return range;
     }
 
     // Fallback: first line
@@ -69,16 +69,16 @@ fn warning_to_range(warning: &ValidationWarning, position_map: &PositionMap) -> 
     }
 
     // Try to find range from position map
-    if let (Some(workflow_id), Some(step_id)) = (&warning.workflow_id, &warning.step_id) {
-        if let Some(range) = position_map.get_step_range(workflow_id, step_id) {
-            return range;
-        }
+    if let (Some(workflow_id), Some(step_id)) = (&warning.workflow_id, &warning.step_id)
+        && let Some(range) = position_map.get_step_range(workflow_id, step_id)
+    {
+        return range;
     }
 
-    if let Some(workflow_id) = &warning.workflow_id {
-        if let Some(range) = position_map.get_workflow_range(workflow_id) {
-            return range;
-        }
+    if let Some(workflow_id) = &warning.workflow_id
+        && let Some(range) = position_map.get_workflow_range(workflow_id)
+    {
+        return range;
     }
 
     // Fallback: first line

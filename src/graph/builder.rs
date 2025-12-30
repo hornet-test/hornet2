@@ -1,7 +1,7 @@
 use super::{FlowEdge, FlowGraph, FlowNode};
 use crate::error::Result;
-use crate::models::arazzo::{Step, Workflow};
 use crate::models::OpenApiV3Spec;
+use crate::models::arazzo::{Step, Workflow};
 use regex::Regex;
 use std::collections::HashSet;
 
@@ -39,10 +39,10 @@ impl<'a> FlowGraphBuilder<'a> {
                 let mut node = FlowNode::from_step(step);
 
                 // Resolve HTTP method from OpenAPI if available
-                if let Some(openapi) = self.openapi {
-                    if let Some(operation_id) = &step.operation_id {
-                        node.method = self.resolve_method_by_operation_id(openapi, operation_id);
-                    }
+                if let Some(openapi) = self.openapi
+                    && let Some(operation_id) = &step.operation_id
+                {
+                    node.method = self.resolve_method_by_operation_id(openapi, operation_id);
                 }
 
                 graph.add_node(node)
@@ -56,17 +56,17 @@ impl<'a> FlowGraphBuilder<'a> {
             let mut has_goto = false;
 
             // Check onSuccess for goto
-            if let Some(ref actions) = current_step.on_success {
-                if actions.iter().any(|a| a.action_type == "goto") {
-                    has_goto = true;
-                }
+            if let Some(ref actions) = current_step.on_success
+                && actions.iter().any(|a| a.action_type == "goto")
+            {
+                has_goto = true;
             }
 
             // Check onFailure for goto
-            if let Some(ref actions) = current_step.on_failure {
-                if actions.iter().any(|a| a.action_type == "goto") {
-                    has_goto = true;
-                }
+            if let Some(ref actions) = current_step.on_failure
+                && actions.iter().any(|a| a.action_type == "goto")
+            {
+                has_goto = true;
             }
 
             if !has_goto {
@@ -89,16 +89,16 @@ impl<'a> FlowGraphBuilder<'a> {
 
         // Step 4: Add conditional edges based on success criteria
         for (i, step) in self.workflow.steps.iter().enumerate() {
-            if let Some(ref criteria) = step.success_criteria {
-                if !criteria.is_empty() {
-                    let description = format!("Success criteria: {} conditions", criteria.len());
-                    // Add self-loop to indicate conditional execution
-                    graph.add_edge(
-                        node_indices[i],
-                        node_indices[i],
-                        FlowEdge::conditional(description),
-                    );
-                }
+            if let Some(ref criteria) = step.success_criteria
+                && !criteria.is_empty()
+            {
+                let description = format!("Success criteria: {} conditions", criteria.len());
+                // Add self-loop to indicate conditional execution
+                graph.add_edge(
+                    node_indices[i],
+                    node_indices[i],
+                    FlowEdge::conditional(description),
+                );
             }
         }
 
@@ -109,18 +109,16 @@ impl<'a> FlowGraphBuilder<'a> {
             // Handle onSuccess
             if let Some(ref actions) = step.on_success {
                 for action in actions {
-                    if action.action_type == "goto" {
-                        if let Some(target_id) =
+                    if action.action_type == "goto"
+                        && let Some(target_id) =
                             action.config.get("stepId").and_then(|v| v.as_str())
-                        {
-                            if let Some(target_idx) = graph.get_node_index(target_id) {
-                                graph.add_edge(
-                                    source_idx,
-                                    target_idx,
-                                    FlowEdge::on_success(action.name.clone()),
-                                );
-                            }
-                        }
+                        && let Some(target_idx) = graph.get_node_index(target_id)
+                    {
+                        graph.add_edge(
+                            source_idx,
+                            target_idx,
+                            FlowEdge::on_success(action.name.clone()),
+                        );
                     }
                 }
             }
@@ -128,18 +126,16 @@ impl<'a> FlowGraphBuilder<'a> {
             // Handle onFailure
             if let Some(ref actions) = step.on_failure {
                 for action in actions {
-                    if action.action_type == "goto" {
-                        if let Some(target_id) =
+                    if action.action_type == "goto"
+                        && let Some(target_id) =
                             action.config.get("stepId").and_then(|v| v.as_str())
-                        {
-                            if let Some(target_idx) = graph.get_node_index(target_id) {
-                                graph.add_edge(
-                                    source_idx,
-                                    target_idx,
-                                    FlowEdge::on_failure(action.name.clone()),
-                                );
-                            }
-                        }
+                        && let Some(target_idx) = graph.get_node_index(target_id)
+                    {
+                        graph.add_edge(
+                            source_idx,
+                            target_idx,
+                            FlowEdge::on_failure(action.name.clone()),
+                        );
                     }
                 }
             }
@@ -189,30 +185,30 @@ impl<'a> FlowGraphBuilder<'a> {
         if let Some(ref paths) = openapi.paths {
             for (_path, path_item) in paths.iter() {
                 // Check all HTTP methods
-                if let Some(ref op) = path_item.get {
-                    if op.operation_id.as_deref() == Some(operation_id) {
-                        return Some("GET".to_string());
-                    }
+                if let Some(ref op) = path_item.get
+                    && op.operation_id.as_deref() == Some(operation_id)
+                {
+                    return Some("GET".to_string());
                 }
-                if let Some(ref op) = path_item.post {
-                    if op.operation_id.as_deref() == Some(operation_id) {
-                        return Some("POST".to_string());
-                    }
+                if let Some(ref op) = path_item.post
+                    && op.operation_id.as_deref() == Some(operation_id)
+                {
+                    return Some("POST".to_string());
                 }
-                if let Some(ref op) = path_item.put {
-                    if op.operation_id.as_deref() == Some(operation_id) {
-                        return Some("PUT".to_string());
-                    }
+                if let Some(ref op) = path_item.put
+                    && op.operation_id.as_deref() == Some(operation_id)
+                {
+                    return Some("PUT".to_string());
                 }
-                if let Some(ref op) = path_item.delete {
-                    if op.operation_id.as_deref() == Some(operation_id) {
-                        return Some("DELETE".to_string());
-                    }
+                if let Some(ref op) = path_item.delete
+                    && op.operation_id.as_deref() == Some(operation_id)
+                {
+                    return Some("DELETE".to_string());
                 }
-                if let Some(ref op) = path_item.patch {
-                    if op.operation_id.as_deref() == Some(operation_id) {
-                        return Some("PATCH".to_string());
-                    }
+                if let Some(ref op) = path_item.patch
+                    && op.operation_id.as_deref() == Some(operation_id)
+                {
+                    return Some("PATCH".to_string());
                 }
             }
         }

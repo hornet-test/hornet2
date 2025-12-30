@@ -1,7 +1,7 @@
 use super::{EdgeType, FlowGraph};
 use crate::error::Result;
 use petgraph::visit::EdgeRef;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// Exporter for flow graphs
 pub struct FlowGraphExporter<'a> {

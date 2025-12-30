@@ -122,16 +122,14 @@ impl ProjectScanner {
 
             let path = entry.path();
 
-            if path.is_file() {
-                if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
-                    if (filename.starts_with("openapi")
-                        || filename == "openapi.yaml"
-                        || filename == "openapi.yml")
-                        && (filename.ends_with(".yaml") || filename.ends_with(".yml"))
-                    {
-                        openapi_files.push(path);
-                    }
-                }
+            if path.is_file()
+                && let Some(filename) = path.file_name().and_then(|n| n.to_str())
+                && (filename.starts_with("openapi")
+                    || filename == "openapi.yaml"
+                    || filename == "openapi.yml")
+                && (filename.ends_with(".yaml") || filename.ends_with(".yml"))
+            {
+                openapi_files.push(path);
             }
         }
 

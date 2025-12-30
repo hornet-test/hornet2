@@ -1,11 +1,12 @@
 use crate::{
+    HornetError, Result,
     cli::OutputFormat,
     graph::{
         builder::build_flow_graph,
         exporter::{export_dot, export_json, export_mermaid},
         validator::validate_flow_graph,
     },
-    loader, HornetError, Result,
+    loader,
 };
 use colored::*;
 use std::path::{Path, PathBuf};

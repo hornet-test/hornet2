@@ -6,7 +6,7 @@ pub mod serve;
 pub mod validate;
 pub mod visualize;
 
-pub use convert::{execute_convert, execute_run, ConvertCommandArgs, RunCommandArgs};
+pub use convert::{ConvertCommandArgs, RunCommandArgs, execute_convert, execute_run};
 pub use export_arazzo::execute_export_arazzo;
 pub use export_openapi::execute_export_openapi;
 pub use list::execute_list;

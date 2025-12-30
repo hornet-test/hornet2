@@ -1,8 +1,8 @@
+use super::ErrorType;
 use super::data_dependencies::DataDependencyValidator;
 use super::operations::OperationValidator;
 use super::parameters::ParameterValidator;
 use super::schemas::SchemaValidator;
-use super::ErrorType;
 use crate::error::Result;
 use crate::models::arazzo::ArazzoSpec;
 use oas3::OpenApiV3Spec;

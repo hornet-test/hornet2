@@ -69,9 +69,10 @@ impl<'a> DataDependencyValidator<'a> {
                     }
 
                     // Check if referenced step comes before current step
-                    if let Some(&ref_idx) = step_order.get(&step_ref.step_id) {
-                        if ref_idx >= current_idx {
-                            errors.push(
+                    if let Some(&ref_idx) = step_order.get(&step_ref.step_id)
+                        && ref_idx >= current_idx
+                    {
+                        errors.push(
                                 ValidationError::new(
                                     ErrorType::StepOrderViolation,
                                     format!(
@@ -82,7 +83,6 @@ impl<'a> DataDependencyValidator<'a> {
                                 .with_workflow(&workflow.workflow_id)
                                 .with_step(&step.step_id),
                             );
-                        }
                     }
 
                     // Track that this output is referenced

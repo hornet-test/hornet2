@@ -55,28 +55,26 @@ pub fn provide_completion(
                         ];
 
                         for (method, op_option) in &operations {
-                            if let Some(op) = op_option {
-                                if let Some(op_id) = &op.operation_id {
-                                    let detail = format!("{} {}", method, path);
+                            if let Some(op) = op_option
+                                && let Some(op_id) = &op.operation_id
+                            {
+                                let detail = format!("{} {}", method, path);
 
-                                    let documentation =
-                                        op.summary.as_ref().or(op.description.as_ref()).map(
-                                            |text| {
-                                                Documentation::MarkupContent(MarkupContent {
-                                                    kind: MarkupKind::Markdown,
-                                                    value: text.clone(),
-                                                })
-                                            },
-                                        );
-
-                                    items.push(CompletionItem {
-                                        label: op_id.clone(),
-                                        kind: Some(CompletionItemKind::FUNCTION),
-                                        detail: Some(detail),
-                                        documentation,
-                                        ..Default::default()
+                                let documentation =
+                                    op.summary.as_ref().or(op.description.as_ref()).map(|text| {
+                                        Documentation::MarkupContent(MarkupContent {
+                                            kind: MarkupKind::Markdown,
+                                            value: text.clone(),
+                                        })
                                     });
-                                }
+
+                                items.push(CompletionItem {
+                                    label: op_id.clone(),
+                                    kind: Some(CompletionItemKind::FUNCTION),
+                                    detail: Some(detail),
+                                    documentation,
+                                    ..Default::default()
+                                });
                             }
                         }
                     }

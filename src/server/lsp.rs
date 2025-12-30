@@ -1,7 +1,7 @@
 use axum::{
     extract::{
-        ws::{Message, WebSocket, WebSocketUpgrade},
         State,
+        ws::{Message, WebSocket, WebSocketUpgrade},
     },
     response::Response,
 };
@@ -75,10 +75,10 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                             // Empty line marks end of headers
                             break;
                         }
-                        if let Some(len_str) = line.strip_prefix("Content-Length: ") {
-                            if let Ok(len) = len_str.parse::<usize>() {
-                                content_length = len;
-                            }
+                        if let Some(len_str) = line.strip_prefix("Content-Length: ")
+                            && let Ok(len) = len_str.parse::<usize>()
+                        {
+                            content_length = len;
                         }
                     }
                     Err(e) => {

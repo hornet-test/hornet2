@@ -1,7 +1,8 @@
 use clap::Parser;
 use hornet2::{
+    Result,
     cli::{Cli, Commands, ExportFormat},
-    commands, Result,
+    commands,
 };
 
 #[tokio::main]

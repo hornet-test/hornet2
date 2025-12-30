@@ -1,8 +1,8 @@
 use axum::{
+    Router,
     body::Body,
     http::{Request, StatusCode},
     routing::get,
-    Router,
 };
 use hornet2::server::{api, state::AppState};
 use std::sync::{Arc, RwLock};

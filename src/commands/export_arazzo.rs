@@ -32,7 +32,7 @@ pub fn execute_export_arazzo(format: &str, output: Option<&Path>) -> Result<()> 
             return Err(HornetError::ValidationError(format!(
                 "Unsupported format: {}",
                 format
-            )))
+            )));
         }
     };
 

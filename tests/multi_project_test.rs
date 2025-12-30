@@ -53,12 +53,14 @@ fn test_project_metadata_openapi_detection() {
 
         for openapi_path in &project.openapi_paths {
             assert!(openapi_path.exists());
-            assert!(openapi_path
-                .file_name()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .contains("openapi"));
+            assert!(
+                openapi_path
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .contains("openapi")
+            );
         }
     }
 }

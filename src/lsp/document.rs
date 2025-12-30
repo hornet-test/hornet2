@@ -3,7 +3,7 @@ use regex::Regex;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::mpsc;
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 use tower_lsp::lsp_types::{Position, Range, Url};
 
 /// Request to validate a document
@@ -163,7 +163,7 @@ impl PositionMap {
                     ),
                 );
 
-                if let (Some(ref wf_id), Some(ref step_id)) = (&current_workflow, &current_step) {
+                if let (Some(wf_id), Some(step_id)) = (&current_workflow, &current_step) {
                     let qualified_op_id = format!("{}.{}.{}", wf_id, step_id, op_id);
                     operation_ids.insert(qualified_op_id, range);
                 }

@@ -1,6 +1,7 @@
 use crate::{
+    HornetError, Result,
     graph::{builder::build_flow_graph, validator::validate_flow_graph},
-    loader, HornetError, Result,
+    loader,
 };
 use colored::*;
 use std::collections::HashMap;
@@ -95,7 +96,7 @@ fn validate_files(openapi_path: &Path, arazzo_path: &Path) -> Result<()> {
     };
 
     // Validate Arazzo-OpenAPI consistency
-    if let (Some(ref arazzo), Some(ref openapi)) = (&arazzo, &openapi) {
+    if let (Some(arazzo), Some(openapi)) = (&arazzo, &openapi) {
         println!(
             "{}",
             "Validating Arazzo-OpenAPI consistency...".bright_blue()
@@ -205,22 +206,22 @@ fn build_line_map(file_path: &Path) -> Result<HashMap<String, usize>> {
         let trimmed = line.trim();
 
         // Match workflowId: value
-        if let Some(pos) = trimmed.find("workflowId:") {
-            if let Some(id) = trimmed[pos + 11..].trim().split('#').next() {
-                let id = id.trim();
-                if !id.is_empty() {
-                    map.insert(format!("workflow:{}", id), line_number);
-                }
+        if let Some(pos) = trimmed.find("workflowId:")
+            && let Some(id) = trimmed[pos + 11..].trim().split('#').next()
+        {
+            let id = id.trim();
+            if !id.is_empty() {
+                map.insert(format!("workflow:{}", id), line_number);
             }
         }
 
         // Match stepId: value
-        if let Some(pos) = trimmed.find("stepId:") {
-            if let Some(id) = trimmed[pos + 7..].trim().split('#').next() {
-                let id = id.trim();
-                if !id.is_empty() {
-                    map.insert(format!("step:{}", id), line_number);
-                }
+        if let Some(pos) = trimmed.find("stepId:")
+            && let Some(id) = trimmed[pos + 7..].trim().split('#').next()
+        {
+            let id = id.trim();
+            if !id.is_empty() {
+                map.insert(format!("step:{}", id), line_number);
             }
         }
     }
@@ -250,11 +251,11 @@ fn annotate_with_line_numbers(
                 error.file_path = Some(file_name.to_string());
                 error.line_number = Some(line_num);
             }
-        } else if let Some(workflow_id) = &error.workflow_id {
-            if let Some(&line_num) = line_map.get(&format!("workflow:{}", workflow_id)) {
-                error.file_path = Some(file_name.to_string());
-                error.line_number = Some(line_num);
-            }
+        } else if let Some(workflow_id) = &error.workflow_id
+            && let Some(&line_num) = line_map.get(&format!("workflow:{}", workflow_id))
+        {
+            error.file_path = Some(file_name.to_string());
+            error.line_number = Some(line_num);
         }
     }
 
@@ -265,11 +266,11 @@ fn annotate_with_line_numbers(
                 warning.file_path = Some(file_name.to_string());
                 warning.line_number = Some(line_num);
             }
-        } else if let Some(workflow_id) = &warning.workflow_id {
-            if let Some(&line_num) = line_map.get(&format!("workflow:{}", workflow_id)) {
-                warning.file_path = Some(file_name.to_string());
-                warning.line_number = Some(line_num);
-            }
+        } else if let Some(workflow_id) = &warning.workflow_id
+            && let Some(&line_num) = line_map.get(&format!("workflow:{}", workflow_id))
+        {
+            warning.file_path = Some(file_name.to_string());
+            warning.line_number = Some(line_num);
         }
     }
 
