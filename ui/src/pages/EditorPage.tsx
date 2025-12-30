@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { OperationList } from '../components/OperationList';
 import { WorkflowView } from '../components/WorkflowView';
 import { YamlEditor } from '../components/YamlEditor';
@@ -11,6 +12,7 @@ import { useProjectStore } from '../stores/projectStore';
 
 export const EditorPage: React.FC = () => {
   const { currentProject } = useProjectStore();
+  const [searchParams, setSearchParams] = useSearchParams();
   const {
     isLoading,
     error,
@@ -38,10 +40,12 @@ export const EditorPage: React.FC = () => {
     saveWorkflow,
     createNewWorkflow,
   } = useEditorStore();
-  const [viewMode, setViewMode] = useState<'visual' | 'yaml' | 'split'>('split');
   const [showUnsavedWarning, setShowUnsavedWarning] = useState(false);
   const [pendingAction, setPendingAction] = useState<'load' | 'new' | null>(null);
   const [pendingWorkflowId, setPendingWorkflowId] = useState<string | null>(null);
+
+  // Read view mode from URL query parameters
+  const viewMode = (searchParams.get('mode') as 'visual' | 'yaml' | 'split') || 'split';
 
   useEffect(() => {
     if (currentProject) {
@@ -49,6 +53,14 @@ export const EditorPage: React.FC = () => {
       void loadWorkflows(currentProject);
     }
   }, [loadOperations, loadWorkflows, currentProject]);
+
+  // Sync workflow from URL to store
+  useEffect(() => {
+    const urlWorkflowId = searchParams.get('workflow');
+    if (urlWorkflowId && urlWorkflowId !== currentWorkflowId && currentProject) {
+      void loadWorkflow(currentProject, urlWorkflowId);
+    }
+  }, [searchParams, currentWorkflowId, currentProject, loadWorkflow]);
 
   // Handle workflow selection
   const handleWorkflowSelect = useCallback(
@@ -58,10 +70,13 @@ export const EditorPage: React.FC = () => {
         setPendingWorkflowId(workflowId);
         setShowUnsavedWarning(true);
       } else {
-        void loadWorkflow(currentProject!, workflowId);
+        setSearchParams((params) => {
+          params.set('workflow', workflowId);
+          return params;
+        });
       }
     },
-    [isDirty, currentProject, loadWorkflow],
+    [isDirty, setSearchParams],
   );
 
   // Handle new workflow
@@ -83,15 +98,29 @@ export const EditorPage: React.FC = () => {
 
   // Handle confirm unsaved action
   const handleConfirmUnsavedAction = useCallback(() => {
-    if (pendingAction === 'load' && pendingWorkflowId && currentProject) {
-      void loadWorkflow(currentProject, pendingWorkflowId);
+    if (pendingAction === 'load' && pendingWorkflowId) {
+      setSearchParams((params) => {
+        params.set('workflow', pendingWorkflowId);
+        return params;
+      });
     } else if (pendingAction === 'new') {
       createNewWorkflow();
     }
     setShowUnsavedWarning(false);
     setPendingAction(null);
     setPendingWorkflowId(null);
-  }, [pendingAction, pendingWorkflowId, currentProject, loadWorkflow, createNewWorkflow]);
+  }, [pendingAction, pendingWorkflowId, setSearchParams, createNewWorkflow]);
+
+  // Handle view mode change
+  const handleViewModeChange = useCallback(
+    (mode: 'visual' | 'yaml' | 'split') => {
+      setSearchParams((params) => {
+        params.set('mode', mode);
+        return params;
+      });
+    },
+    [setSearchParams],
+  );
 
   if (isLoading) {
     return (
@@ -156,19 +185,19 @@ export const EditorPage: React.FC = () => {
           <div className="view-mode-toggle">
             <button
               className={viewMode === 'visual' ? 'active' : ''}
-              onClick={() => setViewMode('visual')}
+              onClick={() => handleViewModeChange('visual')}
             >
               Visual
             </button>
             <button
               className={viewMode === 'split' ? 'active' : ''}
-              onClick={() => setViewMode('split')}
+              onClick={() => handleViewModeChange('split')}
             >
               Split
             </button>
             <button
               className={viewMode === 'yaml' ? 'active' : ''}
-              onClick={() => setViewMode('yaml')}
+              onClick={() => handleViewModeChange('yaml')}
             >
               YAML
             </button>

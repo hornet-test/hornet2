@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import App from './App';
 import type { GraphData, WorkflowSummary } from './types/graph';
 
@@ -99,7 +100,11 @@ describe('App', () => {
   });
 
   it('loads workflows and selects the first workflow automatically', async () => {
-    render(<App />);
+    render(
+      <MemoryRouter initialEntries={['/projects/test-project/visualization']}>
+        <App />
+      </MemoryRouter>,
+    );
 
     await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledWith('/api/projects'));
     await waitFor(() =>
@@ -115,7 +120,11 @@ describe('App', () => {
   });
 
   it('allows changing layout selection', async () => {
-    render(<App />);
+    render(
+      <MemoryRouter initialEntries={['/projects/test-project/visualization']}>
+        <App />
+      </MemoryRouter>,
+    );
     await waitFor(() => expect(screen.getAllByTestId('layout-select')[0]).toBeInTheDocument());
 
     const [layoutSelect] = screen.getAllByTestId('layout-select');

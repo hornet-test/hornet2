@@ -1,24 +1,43 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
+import { Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { VisualizationPage } from './pages/VisualizationPage';
 import { EditorPage } from './pages/EditorPage';
 import { useProjectStore } from './stores/projectStore';
 
 type PageType = 'visualization' | 'editor';
 
-export default function App() {
-  const [currentPage, setCurrentPage] = useState<PageType>('visualization');
+function ProjectLayout() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { projectName } = useParams<{ projectName: string }>();
   const {
     projects,
     currentProject,
     selectProject,
-    loadProjects,
     isLoading: isProjectLoading,
     error: projectError,
   } = useProjectStore();
 
+  // Determine current page from URL
+  const currentPage: PageType = location.pathname.includes('/editor') ? 'editor' : 'visualization';
+
+  // Sync projectName from URL to store
   useEffect(() => {
-    void loadProjects();
-  }, [loadProjects]);
+    if (projectName && projectName !== currentProject) {
+      selectProject(projectName);
+    }
+  }, [projectName, currentProject, selectProject]);
+
+  const handleTabChange = (page: PageType) => {
+    if (projectName) {
+      void navigate(`/projects/${projectName}/${page}`);
+    }
+  };
+
+  const handleProjectChange = (newProject: string) => {
+    selectProject(newProject);
+    void navigate(`/projects/${newProject}/${currentPage}`);
+  };
 
   return (
     <div className="app">
@@ -35,7 +54,7 @@ export default function App() {
               <select
                 id="project-select"
                 value={currentProject || ''}
-                onChange={(e) => selectProject(e.target.value)}
+                onChange={(e) => handleProjectChange(e.target.value)}
                 disabled={isProjectLoading}
               >
                 {!currentProject && <option value="">Select Project...</option>}
@@ -51,13 +70,13 @@ export default function App() {
           <nav className="nav-tabs">
             <button
               className={`nav-tab ${currentPage === 'visualization' ? 'active' : ''}`}
-              onClick={() => setCurrentPage('visualization')}
+              onClick={() => handleTabChange('visualization')}
             >
               Visualization
             </button>
             <button
               className={`nav-tab ${currentPage === 'editor' ? 'active' : ''}`}
-              onClick={() => setCurrentPage('editor')}
+              onClick={() => handleTabChange('editor')}
             >
               Editor
             </button>
@@ -170,7 +189,7 @@ export default function App() {
           font-size: 0.9rem;
           min-width: 150px;
         }
-        
+
         .project-selector select option {
           background: white;
           color: black;
@@ -209,14 +228,14 @@ export default function App() {
           display: flex;
           flex-direction: column;
         }
-        
+
         .error-banner {
           background: #dc3545;
           color: white;
           padding: 1rem;
           text-align: center;
         }
-        
+
         .no-project {
           flex: 1;
           display: flex;
@@ -227,5 +246,77 @@ export default function App() {
         }
       `}</style>
     </div>
+  );
+}
+
+function WelcomePage() {
+  const navigate = useNavigate();
+  const { projects, loadProjects, isLoading } = useProjectStore();
+
+  useEffect(() => {
+    void loadProjects();
+  }, [loadProjects]);
+
+  useEffect(() => {
+    // Auto-redirect to first project if available
+    if (!isLoading && projects.length > 0) {
+      void navigate(`/projects/${projects[0].name}/visualization`);
+    }
+  }, [projects, isLoading, navigate]);
+
+  return (
+    <div className="welcome-page">
+      <div className="welcome-content">
+        <h1>Hornet2</h1>
+        <p>Document-driven API testing tool</p>
+        {isLoading ? (
+          <p>Loading projects...</p>
+        ) : projects.length === 0 ? (
+          <p>No projects found.</p>
+        ) : (
+          <p>Redirecting...</p>
+        )}
+      </div>
+      <style>{`
+        .welcome-page {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 100vh;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+        }
+
+        .welcome-content {
+          text-align: center;
+        }
+
+        .welcome-content h1 {
+          font-size: 3rem;
+          margin: 0 0 1rem 0;
+        }
+
+        .welcome-content p {
+          font-size: 1.2rem;
+          opacity: 0.9;
+        }
+      `}</style>
+    </div>
+  );
+}
+
+export default function App() {
+  const { loadProjects } = useProjectStore();
+
+  useEffect(() => {
+    void loadProjects();
+  }, [loadProjects]);
+
+  return (
+    <Routes>
+      <Route path="/" element={<WelcomePage />} />
+      <Route path="/projects/:projectName/visualization" element={<ProjectLayout />} />
+      <Route path="/projects/:projectName/editor" element={<ProjectLayout />} />
+    </Routes>
   );
 }

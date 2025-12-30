@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Controls } from '../components/Controls';
 import { CytoscapeView } from '../components/CytoscapeView';
 import { DetailsPanel } from '../components/DetailsPanel';
@@ -21,15 +22,18 @@ const layoutOptions: LayoutOption[] = [
 
 export const VisualizationPage: React.FC = () => {
   const { currentProject: project } = useProjectStore();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [workflows, setWorkflows] = useState<WorkflowSummary[]>([]);
-  const [selectedWorkflow, setSelectedWorkflow] = useState<string>('');
-  const [layout, setLayout] = useState<LayoutOption['value']>('dagre');
   const [status, setStatus] = useState<StatusMessage>({
     message: 'Loading projects...',
     type: 'info',
   });
   const [graph, setGraph] = useState<GraphData | null>(null);
   const [selectedNode, setSelectedNode] = useState<SelectedNode | null>(null);
+
+  // Read state from URL query parameters
+  const selectedWorkflow = searchParams.get('workflow') || '';
+  const layout = (searchParams.get('layout') as LayoutOption['value']) || 'dagre';
 
   const selectedWorkflowLabel = useMemo(
     () => workflows.find((wf) => wf.workflow_id === selectedWorkflow)?.workflow_id ?? '',
@@ -49,9 +53,15 @@ export const VisualizationPage: React.FC = () => {
       setWorkflows(newWorkflows);
 
       if (newWorkflows.length) {
-        setSelectedWorkflow(newWorkflows[0].workflow_id);
+        // If no workflow is selected in URL, select the first one
+        const currentWorkflow = searchParams.get('workflow');
+        if (!currentWorkflow || !newWorkflows.find((w) => w.workflow_id === currentWorkflow)) {
+          setSearchParams((params) => {
+            params.set('workflow', newWorkflows[0].workflow_id);
+            return params;
+          });
+        }
       } else {
-        setSelectedWorkflow('');
         setGraph(null);
         setStatus({ message: `No workflows found for project ${project}`, type: 'error' });
         return;
@@ -61,7 +71,7 @@ export const VisualizationPage: React.FC = () => {
     } catch (error) {
       setStatus({ message: `Error: ${(error as Error).message}`, type: 'error' });
     }
-  }, [project]);
+  }, [project, searchParams, setSearchParams]);
 
   const fetchGraph = useCallback(
     async (workflowId: string) => {
@@ -100,12 +110,18 @@ export const VisualizationPage: React.FC = () => {
   }, [fetchGraph, selectedWorkflow, project]);
 
   const handleWorkflowChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedWorkflow(event.target.value);
+    setSearchParams((params) => {
+      params.set('workflow', event.target.value);
+      return params;
+    });
     setSelectedNode(null);
   };
 
   const handleLayoutChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    setLayout(event.target.value as LayoutOption['value']);
+    setSearchParams((params) => {
+      params.set('layout', event.target.value);
+      return params;
+    });
   };
 
   const handleRefresh = () => {
