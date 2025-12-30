@@ -10,6 +10,11 @@ export default defineConfig({
         target: 'http://localhost:3000',
         changeOrigin: true,
       },
+      '/openobserve': {
+        target: 'http://localhost:5080',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/openobserve/, ''),
+      },
     },
   },
 });

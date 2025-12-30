@@ -400,3 +400,78 @@ feat: add new export format
 fix: resolve data dependency detection bug
 docs: update README with new examples
 ```
+
+## Observability
+
+Hornet2 includes optional observability integration with OpenObserve for both backend and frontend telemetry.
+
+### Backend OpenTelemetry (Rust)
+
+The Rust server exports traces to OpenObserve via OTLP/HTTP protocol.
+
+**Configuration** (via `.env` file):
+- `OTEL_ENABLED=true` - Enable OpenTelemetry export
+- `OTEL_EXPORTER_OTLP_ENDPOINT` - OpenObserve endpoint (default: `http://localhost:5080/api/default`)
+- `OTEL_EXPORTER_OTLP_HEADERS` - Auth header (format: `Authorization=Basic <base64>`)
+- `OTEL_SERVICE_NAME` - Service identifier (default: `hornet2`)
+
+**Implementation** ([src/telemetry/mod.rs](src/telemetry/mod.rs)):
+- Multi-layer tracing subscriber (stdout + OpenTelemetry)
+- Graceful degradation: server starts even if OpenObserve is unavailable
+- Automatic shutdown handling via `TelemetryGuard::Drop`
+- tower-http TraceLayer for automatic HTTP span creation
+- Instrumented API handlers with `#[tracing::instrument]`
+
+**Local Development**:
+```bash
+# Start OpenObserve
+docker run -d -p 5080:5080 \
+  -e ZO_ROOT_USER_EMAIL="root@example.com" \
+  -e ZO_ROOT_USER_PASSWORD="yourpassword" \
+  public.ecr.aws/zinclabs/openobserve:latest
+
+# Configure and run
+cp .env.example .env
+# Edit .env to set OTEL_ENABLED=true
+cargo run -- serve --root-dir . --port 3000
+```
+
+View traces at http://localhost:5080 (Traces → Service: hornet2).
+
+### Frontend Browser RUM (UI)
+
+The UI integrates OpenObserve Browser RUM for Real User Monitoring, session replay, and error tracking.
+
+**Configuration** (via `ui/.env` file):
+- `VITE_OPENOBSERVE_ENABLED=true` - Enable browser RUM
+- `VITE_OPENOBSERVE_CLIENT_TOKEN` - RUM client token from OpenObserve UI
+- `VITE_OPENOBSERVE_ENDPOINT` - Endpoint (default: `/openobserve`, proxied in dev mode)
+- `VITE_OPENOBSERVE_ORG` - Organization (default: `default`)
+- `VITE_OPENOBSERVE_PRIVACY_LEVEL` - Privacy level: `allow`, `mask-user-input`, or `mask`
+
+**Implementation** ([ui/src/main.tsx](ui/src/main.tsx)):
+- Dynamic import to avoid loading libraries when disabled
+- Environment-based configuration
+- Development vs production mode auto-detection
+- Session replay recording
+- Automatic error forwarding to logs
+
+**Local Development**:
+```bash
+# Create UI environment file
+cp ui/.env.example ui/.env
+# Edit ui/.env to enable and configure RUM
+# Get CLIENT_TOKEN from OpenObserve UI: RUM → Data Sources → Create
+
+# Run development server
+make dev
+# Open http://localhost:5173
+```
+
+View RUM data at http://localhost:5080 (RUM → Sessions).
+
+**Production Deployment**:
+- Set `VITE_OPENOBSERVE_ENDPOINT` to your OpenObserve instance URL
+- Set `VITE_OPENOBSERVE_ENV=production`
+- Ensure secure HTTPS endpoints (insecureHTTP is only enabled in dev mode)
+- Adjust `VITE_OPENOBSERVE_PRIVACY_LEVEL` for compliance requirements

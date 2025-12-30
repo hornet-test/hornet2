@@ -15,6 +15,8 @@
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
+    "@openobserve/browser-logs": "^0.3.1",
+    "@openobserve/browser-rum": "^0.3.1",
     "cytoscape": "^3.33.1",
     "cytoscape-dagre": "^2.5.0",
     "dagre": "^0.8.5",

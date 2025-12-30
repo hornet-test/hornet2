@@ -11,6 +11,12 @@ importers:
       '@monaco-editor/react':
         specifier: ^4.7.0
         version: 4.7.0(monaco-editor@0.55.1)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      '@openobserve/browser-logs':
+        specifier: ^0.3.1
+        version: 0.3.1(@openobserve/browser-rum@0.3.1)
+      '@openobserve/browser-rum':
+        specifier: ^0.3.1
+        version: 0.3.1(@openobserve/browser-logs@0.3.1)
       cytoscape:
         specifier: ^3.33.1
         version: 3.33.1
@@ -480,6 +486,28 @@ packages:
       monaco-editor: '>= 0.25.0 < 1'
       react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
       react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  '@openobserve/browser-core@0.3.1':
+    resolution: {integrity: sha512-Q5BazD4GsL/+fQGPVfSfKveGwYhor0KnMF1exSfce07ngVTf3ZBttKVHjZSVdrpiR/0Jm1DCbeyZt8xqgXA9Xw==}
+
+  '@openobserve/browser-logs@0.3.1':
+    resolution: {integrity: sha512-TootKFGsfaXA1KLuheU6XC7Sv9CQWILY5zRAVdOLJKdfPGQ3d5wBPyZIqUe91WeE3lGLCI8YF/7X9iqRcfj90g==}
+    peerDependencies:
+      '@openobserve/browser-rum': 0.3.1
+    peerDependenciesMeta:
+      '@openobserve/browser-rum':
+        optional: true
+
+  '@openobserve/browser-rum-core@0.3.1':
+    resolution: {integrity: sha512-cv2WEtntLVabMFbzP4XvlpuYOx6ToFYheJyGUs4jagv/nlW6U+a4DnajSK0Mtgmizz4H3IDVI4LmxHNuRxAHbA==}
+
+  '@openobserve/browser-rum@0.3.1':
+    resolution: {integrity: sha512-g6Np152uE7NoJsq4niQyzgg1LsFm6iuIQ45mcYxQaPBEacBNIoWRP4GU3IcF7WmJMnqCg3YSau4HtetCexu6fQ==}
+    peerDependencies:
+      '@openobserve/browser-logs': 0.3.1
+    peerDependenciesMeta:
+      '@openobserve/browser-logs':
+        optional: true
 
   '@rolldown/pluginutils@1.0.0-beta.53':
     resolution: {integrity: sha512-vENRlFU4YbrwVqNDZ7fLvy+JR1CRkyr01jhSiDpE1u6py3OMzQfztQU2jxykW3ALNxO4kSlqIDeYyD0Y9RcQeQ==}
@@ -2379,6 +2407,25 @@ snapshots:
       monaco-editor: 0.55.1
       react: 19.2.3
       react-dom: 19.2.3(react@19.2.3)
+
+  '@openobserve/browser-core@0.3.1': {}
+
+  '@openobserve/browser-logs@0.3.1(@openobserve/browser-rum@0.3.1)':
+    dependencies:
+      '@openobserve/browser-core': 0.3.1
+    optionalDependencies:
+      '@openobserve/browser-rum': 0.3.1(@openobserve/browser-logs@0.3.1)
+
+  '@openobserve/browser-rum-core@0.3.1':
+    dependencies:
+      '@openobserve/browser-core': 0.3.1
+
+  '@openobserve/browser-rum@0.3.1(@openobserve/browser-logs@0.3.1)':
+    dependencies:
+      '@openobserve/browser-core': 0.3.1
+      '@openobserve/browser-rum-core': 0.3.1
+    optionalDependencies:
+      '@openobserve/browser-logs': 0.3.1(@openobserve/browser-rum@0.3.1)
 
   '@rolldown/pluginutils@1.0.0-beta.53': {}
 
