@@ -66,6 +66,10 @@ pub enum Commands {
         /// Port number
         #[arg(short, long, default_value = "3000")]
         port: u16,
+
+        /// Start in LSP mode (Language Server Protocol)
+        #[arg(long)]
+        lsp: bool,
     },
 
     /// Convert Arazzo workflow to test script

@@ -1,4 +1,5 @@
 pub mod api;
+pub mod lsp;
 pub mod state;
 
 use axum::{http::StatusCode, routing::get, Router};
@@ -48,6 +49,8 @@ pub async fn start_server(addr: SocketAddr, root_dir: PathBuf) -> crate::Result<
         .route("/api/validate", axum::routing::post(api::validate_arazzo))
         .route("/api/openapi.json", get(api::get_openapi_spec))
         .route("/api/arazzo.json", get(api::get_arazzo_spec))
+        // LSP
+        .route("/lsp", get(lsp::lsp_handler))
         // Static files (CSS, JS) - from dist folder
         .route("/assets/{*path}", get(serve_static))
         // ルートルートはindex.htmlを提供

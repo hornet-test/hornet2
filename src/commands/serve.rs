@@ -2,19 +2,39 @@ use crate::{server, Result};
 use colored::*;
 use std::path::Path;
 
-pub async fn execute_serve(root_dir: &Path, port: u16) -> Result<()> {
-    println!(
-        "{}",
-        "Starting web server (multi-project mode)...".bright_blue()
-    );
-    println!("  Root directory: {}", root_dir.display());
-    println!("  Port: {}", port);
+pub async fn execute_serve(root_dir: &Path, port: u16, lsp_mode: bool) -> Result<()> {
+    if lsp_mode {
+        // LSP mode
+        eprintln!("Starting hornet2 LSP server...");
+        eprintln!("  Root directory: {}", root_dir.display());
+        eprintln!();
 
-    println!();
+        use crate::lsp::ArazzoLanguageServer;
+        use tower_lsp::{LspService, Server};
 
-    let addr = format!("127.0.0.1:{}", port).parse().unwrap();
+        let (service, socket) =
+            LspService::new(|client| ArazzoLanguageServer::new(client, root_dir.to_path_buf()));
 
-    server::start_server(addr, root_dir.to_path_buf()).await?;
+        Server::new(tokio::io::stdin(), tokio::io::stdout(), socket)
+            .serve(service)
+            .await;
 
-    Ok(())
+        Ok(())
+    } else {
+        // HTTP server mode
+        println!(
+            "{}",
+            "Starting web server (multi-project mode)...".bright_blue()
+        );
+        println!("  Root directory: {}", root_dir.display());
+        println!("  Port: {}", port);
+
+        println!();
+
+        let addr = format!("127.0.0.1:{}", port).parse().unwrap();
+
+        server::start_server(addr, root_dir.to_path_buf()).await?;
+
+        Ok(())
+    }
 }
