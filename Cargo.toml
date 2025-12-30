@@ -35,13 +35,14 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 mime_guess = "2.0"
 
 # OpenTelemetry
-opentelemetry = { version = "0.27", features = ["trace", "metrics", "logs"] }
-opentelemetry_sdk = { version = "0.27", features = ["rt-tokio", "trace", "metrics", "logs"] }
-opentelemetry-otlp = { version = "0.27", features = ["http-proto", "reqwest-client", "trace", "metrics", "logs"] }
-tracing-opentelemetry = "0.28"
-opentelemetry-http = "0.27"
+opentelemetry = { version = "0.31.0", features = ["trace", "metrics", "logs"] }
+opentelemetry_sdk = { version = "0.31.0", features = ["rt-tokio", "trace", "metrics", "logs"] }
+opentelemetry-otlp = { version = "0.31.0", features = ["http-proto", "reqwest-client", "trace", "metrics", "logs"] }
+tracing-opentelemetry = "0.32"
+opentelemetry-http = "0.31.0"
 http = "1.0"
 dotenv = "0.15"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 
 # LSP
 tower-lsp = "0.20"

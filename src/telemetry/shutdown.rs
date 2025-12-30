@@ -1,5 +1,3 @@
-use opentelemetry::global;
-
 pub struct TelemetryGuard {
     _marker: (),
 }
@@ -20,10 +18,9 @@ impl Drop for TelemetryGuard {
     fn drop(&mut self) {
         tracing::info!("Shutting down telemetry...");
 
-        // Flush pending spans
-        global::shutdown_tracer_provider();
-
-        // Allow time for final flush
+        // In OpenTelemetry 0.31+, shutdown is handled automatically
+        // when the TracerProvider is dropped. We just need to allow
+        // time for the final flush to complete.
         std::thread::sleep(std::time::Duration::from_millis(500));
     }
 }

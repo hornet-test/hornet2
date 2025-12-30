@@ -15,7 +15,14 @@ pub fn init_telemetry() -> crate::Result<TelemetryGuard> {
     let config = TelemetryConfig::from_env();
 
     if config.enabled {
-        init_with_otel(&config)?;
+        // Try to initialize with OpenTelemetry, but fall back to stdout-only if it fails
+        if let Err(e) = init_with_otel(&config) {
+            eprintln!(
+                "Failed to initialize OpenTelemetry: {}. Falling back to stdout-only logging.",
+                e
+            );
+            init_stdout_only();
+        }
     } else {
         init_stdout_only();
     }
@@ -24,9 +31,18 @@ pub fn init_telemetry() -> crate::Result<TelemetryGuard> {
 }
 
 fn init_with_otel(config: &TelemetryConfig) -> crate::Result<()> {
-    // Initialize OTLP exporter with reqwest (configured via features)
+    // Create HTTP client explicitly
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .map_err(|e| {
+            crate::HornetError::ValidationError(format!("Failed to build HTTP client: {}", e))
+        })?;
+
+    // Initialize OTLP exporter with HTTP client
     let exporter = opentelemetry_otlp::SpanExporter::builder()
         .with_http()
+        .with_http_client(client)
         .with_endpoint(&config.endpoint)
         .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
         .with_timeout(std::time::Duration::from_secs(5))
@@ -41,14 +57,14 @@ fn init_with_otel(config: &TelemetryConfig) -> crate::Result<()> {
         })?;
 
     // Create resource with service metadata
-    let resource = opentelemetry_sdk::Resource::new(vec![
-        KeyValue::new("service.name", config.service_name.clone()),
-        KeyValue::new("service.version", env!("CARGO_PKG_VERSION")),
-    ]);
+    let resource = opentelemetry_sdk::Resource::builder_empty()
+        .with_service_name(config.service_name.clone())
+        .with_attributes([KeyValue::new("service.version", env!("CARGO_PKG_VERSION"))])
+        .build();
 
     // Create tracer provider
-    let provider = opentelemetry_sdk::trace::TracerProvider::builder()
-        .with_batch_exporter(exporter, opentelemetry_sdk::runtime::Tokio)
+    let provider = opentelemetry_sdk::trace::SdkTracerProvider::builder()
+        .with_batch_exporter(exporter)
         .with_resource(resource)
         .build();
 
