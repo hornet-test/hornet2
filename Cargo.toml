@@ -36,8 +36,8 @@ mime_guess = "2.0"
 
 # LSP
 tower-lsp = "0.20"
-lsp-types = "0.95"
-dashmap = "6.0"
+lsp-types = "0.97"
+dashmap = "6.1"
 
 # Utility
 tempfile = "3.24"
