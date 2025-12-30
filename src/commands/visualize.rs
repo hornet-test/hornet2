@@ -5,14 +5,53 @@ use crate::{
         exporter::{export_dot, export_json, export_mermaid},
         validator::validate_flow_graph,
     },
-    loader, Result,
+    loader, HornetError, Result,
 };
 use colored::*;
-use std::path::Path;
 use std::path::PathBuf;
 
 pub fn execute_visualize(
-    arazzo_path: &Path,
+    root_dir: &Option<PathBuf>,
+    arazzo_path: &Option<PathBuf>,
+    openapi_path: &Option<PathBuf>,
+    format: &OutputFormat,
+    output_path: &Option<PathBuf>,
+) -> Result<()> {
+    // Determine file paths
+    let (arazzo_file, openapi_file) = if let Some(root) = root_dir {
+        // Single-project mode
+        let arazzo = root.join("arazzo.yaml");
+        let openapi = root.join("openapi.yaml");
+
+        if !arazzo.exists() {
+            return Err(HornetError::InvalidPath(format!(
+                "arazzo.yaml not found in {}",
+                root.display()
+            )));
+        }
+
+        // OpenAPI is optional
+        let openapi_opt = if openapi.exists() {
+            Some(openapi)
+        } else {
+            None
+        };
+
+        (arazzo, openapi_opt)
+    } else if let Some(arazzo) = arazzo_path {
+        // Individual file mode
+        (arazzo.clone(), openapi_path.clone())
+    } else {
+        return Err(HornetError::ValidationError(
+            "Either --root-dir or --arazzo must be specified".to_string(),
+        ));
+    };
+
+    visualize_workflow(&arazzo_file, &openapi_file, format, output_path)
+}
+
+fn visualize_workflow(
+    arazzo_path: &PathBuf,
     openapi_path: &Option<PathBuf>,
     format: &OutputFormat,
     output_path: &Option<PathBuf>,

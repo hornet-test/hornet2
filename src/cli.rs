@@ -21,20 +21,28 @@ pub enum Commands {
 
     /// Validate OpenAPI and Arazzo files
     Validate {
+        /// Root directory containing openapi.yaml and arazzo.yaml (single-project mode)
+        #[arg(short, long, conflicts_with_all = ["openapi", "arazzo"])]
+        root_dir: Option<PathBuf>,
+
         /// Path to OpenAPI file
-        #[arg(short, long)]
-        openapi: PathBuf,
+        #[arg(short, long, requires = "arazzo")]
+        openapi: Option<PathBuf>,
 
         /// Path to Arazzo file
-        #[arg(short, long)]
-        arazzo: PathBuf,
+        #[arg(short, long, requires = "openapi")]
+        arazzo: Option<PathBuf>,
     },
 
     /// Visualize workflow as a graph
     Visualize {
+        /// Root directory containing openapi.yaml and arazzo.yaml (single-project mode)
+        #[arg(short, long, conflicts_with_all = ["openapi", "arazzo"])]
+        root_dir: Option<PathBuf>,
+
         /// Path to Arazzo file
         #[arg(short, long)]
-        arazzo: PathBuf,
+        arazzo: Option<PathBuf>,
 
         /// Path to OpenAPI file (optional)
         #[arg(short, long)]

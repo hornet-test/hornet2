@@ -12,16 +12,21 @@ async fn main() -> Result<()> {
         Commands::List { arazzo } => {
             commands::execute_list(&arazzo)?;
         }
-        Commands::Validate { openapi, arazzo } => {
-            commands::execute_validate(&openapi, &arazzo)?;
+        Commands::Validate {
+            root_dir,
+            openapi,
+            arazzo,
+        } => {
+            commands::execute_validate(&root_dir, &openapi, &arazzo)?;
         }
         Commands::Visualize {
+            root_dir,
             arazzo,
             openapi,
             format,
             output,
         } => {
-            commands::execute_visualize(&arazzo, &openapi, &format, &output)?;
+            commands::execute_visualize(&root_dir, &arazzo, &openapi, &format, &output)?;
         }
         Commands::Serve { root_dir, port } => {
             commands::execute_serve(&root_dir, port).await?;

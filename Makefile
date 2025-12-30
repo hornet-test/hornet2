@@ -18,11 +18,8 @@ else
   PNPM = cd ui && pnpm
 endif
 
-# Development mode uses hornet2's own files
-DEV_ROOT_DIR := .
-# Legacy single-file mode (for other commands)
-TEST_ARAZZO := tests/fixtures/arazzo.yaml
-TEST_OPENAPI := tests/fixtures/openapi.yaml
+# Root directory for hornet2's own files (default for all commands)
+ROOT_DIR := .
 
 help: ## このヘルプメッセージを表示
 	@echo "$(BLUE)hornet2 - Makefile コマンド$(NC)"
@@ -78,12 +75,12 @@ dev: ## 開発モード: CLIサーバーとUIを同時起動（Ctrl+Cで両方�
 	@echo ""
 	@trap 'kill 0' EXIT; \
 		$(PNPM) dev & \
-		cargo run -- serve --root-dir $(DEV_ROOT_DIR) --port 3000
+		cargo run -- serve --root-dir $(ROOT_DIR) --port 3000
 
 cli-dev: ## CLIサーバーのみ起動
 	@echo "$(BLUE)Starting CLI server on http://localhost:3000$(NC)"
 	@echo "$(YELLOW)Using hornet2's own OpenAPI and Arazzo files$(NC)"
-	@cargo run -- serve --root-dir $(DEV_ROOT_DIR) --port 3000
+	@cargo run -- serve --root-dir $(ROOT_DIR) --port 3000
 
 ui-dev: ## UI開発サーバーのみ起動
 	@echo "$(BLUE)Starting UI dev server on http://localhost:5173$(NC)"
@@ -129,9 +126,9 @@ run: ## CLIを実行（引数: ARGS="..."）
 
 # 例: make visualize ARGS="--format json"
 visualize: ## フロー図を生成（引数: ARGS="--format json"）
-	@cargo run -- visualize --arazzo $(TEST_ARAZZO) --openapi $(TEST_OPENAPI) $(ARGS)
+	@cargo run -- visualize --root-dir $(ROOT_DIR) $(ARGS)
 
 validate: ## OpenAPI/Arazzoを検証
 	@echo "$(BLUE)Validating OpenAPI and Arazzo...$(NC)"
-	@cargo run -- validate --openapi $(TEST_OPENAPI) --arazzo $(TEST_ARAZZO)
+	@cargo run -- validate --root-dir $(ROOT_DIR)
 	@echo "$(GREEN)✓ Validation passed$(NC)"

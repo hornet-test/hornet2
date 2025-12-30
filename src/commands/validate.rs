@@ -1,11 +1,48 @@
 use crate::{
     graph::{builder::build_flow_graph, validator::validate_flow_graph},
-    loader, Result,
+    loader, HornetError, Result,
 };
 use colored::*;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-pub fn execute_validate(openapi_path: &Path, arazzo_path: &Path) -> Result<()> {
+pub fn execute_validate(
+    root_dir: &Option<PathBuf>,
+    openapi_path: &Option<PathBuf>,
+    arazzo_path: &Option<PathBuf>,
+) -> Result<()> {
+    // Determine file paths
+    let (openapi_file, arazzo_file) = if let Some(root) = root_dir {
+        // Single-project mode
+        let openapi = root.join("openapi.yaml");
+        let arazzo = root.join("arazzo.yaml");
+
+        if !openapi.exists() {
+            return Err(HornetError::InvalidPath(format!(
+                "openapi.yaml not found in {}",
+                root.display()
+            )));
+        }
+        if !arazzo.exists() {
+            return Err(HornetError::InvalidPath(format!(
+                "arazzo.yaml not found in {}",
+                root.display()
+            )));
+        }
+
+        (openapi, arazzo)
+    } else if let (Some(openapi), Some(arazzo)) = (openapi_path, arazzo_path) {
+        // Individual file mode
+        (openapi.clone(), arazzo.clone())
+    } else {
+        return Err(HornetError::ValidationError(
+            "Either --root-dir or both --openapi and --arazzo must be specified".to_string(),
+        ));
+    };
+
+    validate_files(&openapi_file, &arazzo_file)
+}
+
+fn validate_files(openapi_path: &Path, arazzo_path: &Path) -> Result<()> {
     let mut has_errors = false;
 
     // Validate OpenAPI
