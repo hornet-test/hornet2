@@ -363,24 +363,9 @@ workflows:
         outputs:
           updatedArazzo: $response.body
 
-      - stepId: validateArazzo
-        description: Validate the updated Arazzo specification
-        operationId: validateArazzo
-        requestBody:
-          contentType: application/json
-          payload:
-            arazzo_content: $steps.verifyArazzoUpdate.outputs.updatedArazzo
-        successCriteria:
-          - context: $statusCode
-            condition: ==
-            value: 200
-        outputs:
-          validationResult: $response.body
-
     outputs:
       originalSpec: $steps.getArazzo.outputs.originalArazzo
       updatedSpec: $steps.verifyArazzoUpdate.outputs.updatedArazzo
-      validation: $steps.validateArazzo.outputs.validationResult
 
   - workflowId: conditional-workflow-management
     summary: Conditional workflow management
