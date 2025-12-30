@@ -5,15 +5,19 @@ pub mod state;
 use axum::{Router, http::StatusCode, routing::get};
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use tower_http::LatencyUnit;
 use tower_http::cors::CorsLayer;
-use tracing_subscriber;
+use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 
 use state::AppState;
 
 /// Webサーバーを起動する（マルチプロジェクトモード）
 pub async fn start_server(addr: SocketAddr, root_dir: PathBuf) -> crate::Result<()> {
-    // トレーシングを初期化
-    tracing_subscriber::fmt::init();
+    // .envファイルを読み込む（エラーは無視）
+    dotenv::dotenv().ok();
+
+    // トレーシングとOpenTelemetryを初期化
+    let _telemetry_guard = crate::telemetry::init_telemetry()?;
 
     // 共有状態を作成
     let state = AppState::new(root_dir)?;
@@ -58,16 +62,60 @@ pub async fn start_server(addr: SocketAddr, root_dir: PathBuf) -> crate::Result<
         // SPAルーティングのフォールバック - 他のすべてのルートに対してindex.htmlを提供
         .fallback(serve_index)
         .with_state(state)
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(
+                    DefaultMakeSpan::new()
+                        .level(tracing::Level::INFO)
+                        .include_headers(false),
+                )
+                .on_response(
+                    DefaultOnResponse::new()
+                        .level(tracing::Level::INFO)
+                        .latency_unit(LatencyUnit::Millis),
+                ),
+        )
         .layer(CorsLayer::permissive());
 
     tracing::info!("Starting server on http://{}", addr);
     tracing::info!("Open http://{} in your browser", addr);
 
-    // サーバーを起動
+    // サーバーを起動（graceful shutdown付き）
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
 
     Ok(())
+}
+
+/// Graceful shutdownのためのシグナルハンドラ
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {
+            tracing::info!("Received Ctrl+C, initiating graceful shutdown");
+        },
+        _ = terminate => {
+            tracing::info!("Received terminate signal, initiating graceful shutdown");
+        },
+    }
 }
 
 /// ui/dist/assets/ から静的ファイル (CSS, JS, etc.) を提供する

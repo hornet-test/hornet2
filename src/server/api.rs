@@ -33,6 +33,13 @@ pub struct ProblemDetails {
 
 impl ProblemDetails {
     fn new(status: StatusCode, type_suffix: &str, title: &str, detail: String) -> Self {
+        tracing::warn!(
+            http.status = status.as_u16(),
+            problem.type = type_suffix,
+            problem.detail = %detail,
+            "Returning problem details"
+        );
+
         Self {
             type_: format!("https://hornet2.dev/problems/{}", type_suffix),
             title: title.to_string(),
@@ -165,6 +172,11 @@ pub struct RequestBodyInfo {
 
 /// GET /api/editor/operations - Get all OpenAPI operations
 /// GET /api/projects/{project_name}/operations
+#[tracing::instrument(
+    name = "api.get_project_operations",
+    skip(state),
+    fields(project_name = %project_name)
+)]
 pub async fn get_project_operations(
     State(state): State<AppState>,
     Path(project_name): Path<String>,
@@ -450,6 +462,11 @@ pub struct ValidationErrorInfo {
 }
 
 /// POST /api/validate - Validate Arazzo YAML
+#[tracing::instrument(
+    name = "api.validate_arazzo",
+    skip(payload),
+    fields(yaml_length = payload.yaml.len())
+)]
 pub async fn validate_arazzo(
     Json(payload): Json<ValidateRequest>,
 ) -> ApiResult<Json<ValidateResponse>> {
@@ -544,6 +561,13 @@ fn extract_location_from_error(error: &str) -> (Option<usize>, Option<usize>) {
 // ============================================================================
 
 /// GET /api/projects - すべてのプロジェクトをリスト
+#[tracing::instrument(
+    name = "api.list_projects",
+    skip(state),
+    fields(
+        project_count = tracing::field::Empty
+    )
+)]
 pub async fn list_projects(State(state): State<AppState>) -> ApiResult<Json<ProjectsResponse>> {
     let mut cache = state.projects.write().map_err(|_| {
         ProblemDetails::new(
@@ -580,12 +604,19 @@ pub async fn list_projects(State(state): State<AppState>) -> ApiResult<Json<Proj
         })
         .collect();
 
+    tracing::Span::current().record("project_count", project_infos.len());
+
     Ok(Json(ProjectsResponse {
         projects: project_infos,
     }))
 }
 
 /// GET /api/projects/{project_name} - プロジェクト詳細を取得
+#[tracing::instrument(
+    name = "api.get_project",
+    skip(state),
+    fields(project_name = %project_name)
+)]
 pub async fn get_project(
     State(state): State<AppState>,
     Path(project_name): Path<String>,
@@ -783,6 +814,14 @@ pub async fn get_project_workflows(
 }
 
 /// POST /api/projects/{project_name}/workflows - ワークフローを作成
+#[tracing::instrument(
+    name = "api.create_project_workflow",
+    skip(state, req),
+    fields(
+        project_name = %project_name,
+        workflow_id = %req.workflow.workflow_id
+    )
+)]
 pub async fn create_project_workflow(
     State(state): State<AppState>,
     Path(project_name): Path<String>,
@@ -923,6 +962,14 @@ pub async fn get_project_workflow(
 }
 
 /// PUT /api/projects/{project_name}/workflows/{workflow_id} - ワークフローを更新
+#[tracing::instrument(
+    name = "api.update_project_workflow",
+    skip(state, workflow),
+    fields(
+        project_name = %project_name,
+        workflow_id = %workflow_id
+    )
+)]
 pub async fn update_project_workflow(
     State(state): State<AppState>,
     Path((project_name, workflow_id)): Path<(String, String)>,
@@ -1099,6 +1146,14 @@ pub async fn delete_project_workflow(
 }
 
 /// GET /api/projects/{project_name}/graph/{workflow_id} - ワークフローグラフを取得
+#[tracing::instrument(
+    name = "api.get_project_graph",
+    skip(state),
+    fields(
+        project_name = %project_name,
+        workflow_id = %workflow_id
+    )
+)]
 pub async fn get_project_graph(
     State(state): State<AppState>,
     Path((project_name, workflow_id)): Path<(String, String)>,

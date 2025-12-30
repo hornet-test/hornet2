@@ -35,6 +35,10 @@ src/
 ├── server/           # Web server (Axum)
 │   ├── api.rs               # API endpoints for multi-project mode
 │   └── state.rs             # Shared application state
+├── telemetry/        # OpenTelemetry integration
+│   ├── mod.rs               # OTLP exporter initialization
+│   ├── config.rs            # Environment-based configuration
+│   └── shutdown.rs          # Graceful shutdown handler
 ├── commands/         # CLI command implementations
 │   ├── list.rs              # List workflows
 │   ├── validate.rs          # Validate specs
@@ -152,6 +156,51 @@ cargo run -- convert --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixture
 # Run tests with k6 (requires k6 installed)
 cargo run -- run --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/openapi.yaml --engine k6
 ```
+
+### OpenTelemetry Configuration
+
+Hornet2 supports OpenTelemetry for distributed tracing, metrics, and logs. Configuration is managed via `.env` file.
+
+**Setup**:
+```bash
+# Copy example configuration
+cp .env.example .env
+
+# Edit .env to configure OpenObserve or other OTLP-compatible backend
+# OTEL_ENABLED=true
+# OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:5080/api/default
+# OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic <credentials>
+# OTEL_SERVICE_NAME=hornet2
+# RUST_LOG=hornet2=debug,tower_http=debug
+```
+
+**With OpenTelemetry enabled** (sends telemetry to OpenObserve):
+```bash
+# Ensure .env has OTEL_ENABLED=true
+cargo run -- serve --root-dir . --port 3000
+```
+
+**Without OpenTelemetry** (stdout logging only):
+```bash
+# Set OTEL_ENABLED=false in .env
+cargo run -- serve --root-dir . --port 3000
+```
+
+**Features**:
+- **Automatic HTTP tracing**: tower-http middleware creates spans for all requests
+- **Instrumented API handlers**: 7 key endpoints have detailed span attributes
+- **Graceful degradation**: Server starts even if telemetry backend is unavailable
+- **Graceful shutdown**: Flushes pending spans on Ctrl+C
+- **Environment-based config**: RUST_LOG controls log levels
+
+**Instrumented endpoints**:
+- `GET /api/projects` - list_projects
+- `GET /api/projects/{name}` - get_project
+- `GET /api/projects/{name}/operations` - get_project_operations
+- `GET /api/projects/{name}/graph/{id}` - get_project_graph
+- `POST /api/validate` - validate_arazzo
+- `POST /api/projects/{name}/workflows` - create_project_workflow
+- `PUT /api/projects/{name}/workflows/{id}` - update_project_workflow
 
 ### Running Tests for a Single Module
 
