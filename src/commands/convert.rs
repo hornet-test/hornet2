@@ -50,7 +50,7 @@ pub fn execute_convert(args: ConvertCommandArgs<'_>) -> Result<()> {
 
     // Arazzoファイルを読み込む
     let arazzo = load_arazzo(arazzo_path)?;
-    println!(
+    eprintln!(
         "{} Loaded Arazzo file: {}",
         "✓".green(),
         arazzo_path.display()
@@ -58,7 +58,7 @@ pub fn execute_convert(args: ConvertCommandArgs<'_>) -> Result<()> {
 
     // OpenAPIファイルを読み込む
     let openapi = load_openapi(openapi_path)?;
-    println!(
+    eprintln!(
         "{} Loaded OpenAPI file: {}",
         "✓".green(),
         openapi_path.display()
