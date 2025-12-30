@@ -88,7 +88,7 @@ impl<'a> FlowGraphExporter<'a> {
             edges.push(json!({
                 "source": source,
                 "target": target,
-                "type": format!("{:?}", edge_data.edge_type),
+                "edge_type": format!("{:?}", edge_data.edge_type),
                 "dataRef": edge_data.data_ref,
                 "description": edge_data.description,
             }));
@@ -152,6 +152,12 @@ impl<'a> FlowGraphExporter<'a> {
             EdgeType::DataDependency => {
                 ("dotted", "blue", edge.data_ref.clone().unwrap_or_default())
             }
+            EdgeType::OnSuccess => (
+                "solid",
+                "green",
+                edge.description.clone().unwrap_or_default(),
+            ),
+            EdgeType::OnFailure => ("solid", "red", edge.description.clone().unwrap_or_default()),
         }
     }
 
@@ -189,6 +195,8 @@ impl<'a> FlowGraphExporter<'a> {
                 EdgeType::Sequential => "-->",
                 EdgeType::Conditional => "-.->",
                 EdgeType::DataDependency => "==>",
+                EdgeType::OnSuccess => "==>",
+                EdgeType::OnFailure => "-.->",
             };
 
             if let Some(label) = self.get_mermaid_edge_label(edge_data) {
@@ -233,6 +241,8 @@ impl<'a> FlowGraphExporter<'a> {
             EdgeType::Sequential => None,
             EdgeType::Conditional => edge.description.clone(),
             EdgeType::DataDependency => edge.data_ref.clone(),
+            EdgeType::OnSuccess => edge.description.clone(),
+            EdgeType::OnFailure => edge.description.clone(),
         }
     }
 }

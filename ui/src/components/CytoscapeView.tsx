@@ -85,6 +85,34 @@ const styles = [
     },
   },
   {
+    selector: 'edge[edge_type="OnSuccess"]',
+    style: {
+      'line-color': '#10b981',
+      'target-arrow-color': '#10b981',
+      'line-style': 'solid',
+      label: 'data(label)',
+      'text-background-opacity': 1,
+      'text-background-color': '#ffffff',
+      'text-background-padding': '3px',
+      'font-size': '10px',
+      color: '#10b981',
+    },
+  },
+  {
+    selector: 'edge[edge_type="OnFailure"]',
+    style: {
+      'line-color': '#ef4444',
+      'target-arrow-color': '#ef4444',
+      'line-style': 'solid',
+      label: 'data(label)',
+      'text-background-opacity': 1,
+      'text-background-color': '#ffffff',
+      'text-background-padding': '3px',
+      'font-size': '10px',
+      color: '#ef4444',
+    },
+  },
+  {
     selector: ':selected',
     style: {
       'border-width': '4px',

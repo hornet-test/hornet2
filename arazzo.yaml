@@ -381,3 +381,129 @@ workflows:
       originalSpec: $steps.getArazzo.outputs.originalArazzo
       updatedSpec: $steps.verifyArazzoUpdate.outputs.updatedArazzo
       validation: $steps.validateArazzo.outputs.validationResult
+
+  - workflowId: conditional-workflow-management
+    summary: Conditional workflow management
+    description: |
+      This workflow demonstrates branching logic:
+      1. Check if a workflow exists
+      2. If it exists, update it (Branch A)
+      3. If it doesn't exist, create it (Branch B)
+      4. Verify the result (Merge)
+      
+      This demonstrates the use of onSuccess and onFailure actions to control the flow.
+    inputs:
+      type: object
+      properties:
+        projectName:
+          type: string
+          default: project1
+        workflowId:
+          type: string
+          default: branching-demo-flow
+    steps:
+      - stepId: checkWorkflow
+        description: Check if the workflow exists
+        operationId: getProjectWorkflow
+        parameters:
+          - name: project_name
+            in: path
+            value: $inputs.projectName
+          - name: workflow_id
+            in: path
+            value: $inputs.workflowId
+        successCriteria:
+          - context: $statusCode
+            condition: ==
+            value: 200
+        onSuccess:
+          - name: Workflow exists
+            type: goto
+            stepId: updateWorkflow
+        onFailure:
+          - name: Workflow missing
+            type: goto
+            stepId: createWorkflow
+            criteria:
+              - context: $statusCode
+                condition: ==
+                value: 404
+
+      - stepId: createWorkflow
+        description: Create the workflow if it doesn't exist
+        operationId: createProjectWorkflow
+        parameters:
+          - name: project_name
+            in: path
+            value: $inputs.projectName
+        requestBody:
+          contentType: application/json
+          payload:
+            workflowId: $inputs.workflowId
+            summary: Created via branching flow
+            steps:
+              - stepId: demo-step
+                operationId: getPetById
+                parameters:
+                  - name: petId
+                    in: path
+                    value: 1
+        successCriteria:
+          - context: $statusCode
+            condition: ==
+            value: 201
+        onSuccess:
+          - name: Go to verification
+            type: goto
+            stepId: verifyWorkflow
+
+      - stepId: updateWorkflow
+        description: Update the workflow if it already exists
+        operationId: updateProjectWorkflow
+        parameters:
+          - name: project_name
+            in: path
+            value: $inputs.projectName
+          - name: workflow_id
+            in: path
+            value: $inputs.workflowId
+        requestBody:
+          contentType: application/json
+          payload:
+            workflowId: $inputs.workflowId
+            summary: Updated via branching flow
+            steps:
+              - stepId: demo-step
+                operationId: getPetById
+                parameters:
+                  - name: petId
+                    in: path
+                    value: 1
+        successCriteria:
+          - context: $statusCode
+            condition: ==
+            value: 200
+        onSuccess:
+          - name: Go to verification
+            type: goto
+            stepId: verifyWorkflow
+
+      - stepId: verifyWorkflow
+        description: Verify the workflow state
+        operationId: getProjectWorkflow
+        parameters:
+          - name: project_name
+            in: path
+            value: $inputs.projectName
+          - name: workflow_id
+            in: path
+            value: $inputs.workflowId
+        successCriteria:
+          - context: $statusCode
+            condition: ==
+            value: 200
+        outputs:
+          finalState: $response.body
+
+    outputs:
+      finalWorkflowState: $steps.verifyWorkflow.outputs.finalState

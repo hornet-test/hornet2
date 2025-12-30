@@ -68,6 +68,12 @@ pub enum EdgeType {
 
     /// Data dependency (step2 uses output from step1)
     DataDependency,
+
+    /// Success path (onSuccess: goto)
+    OnSuccess,
+
+    /// Failure path (onFailure: goto)
+    OnFailure,
 }
 
 impl FlowGraph {
@@ -155,6 +161,24 @@ impl FlowEdge {
         Self {
             edge_type: EdgeType::DataDependency,
             data_ref: Some(data_ref),
+            description: Some(description),
+        }
+    }
+
+    /// Create a success path edge
+    pub fn on_success(description: String) -> Self {
+        Self {
+            edge_type: EdgeType::OnSuccess,
+            data_ref: None,
+            description: Some(description),
+        }
+    }
+
+    /// Create a failure path edge
+    pub fn on_failure(description: String) -> Self {
+        Self {
+            edge_type: EdgeType::OnFailure,
+            data_ref: None,
             description: Some(description),
         }
     }
