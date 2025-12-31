@@ -282,18 +282,50 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   // Sync YAML to Arazzo spec
   syncYamlToSpec: () => {
-    const { yamlContent } = get();
+    const { yamlContent, arazzoSpec } = get();
     try {
-      const parsed = yaml.load(yamlContent) as ArazzoSpec;
+      // Parse YAML as workflow fragment (not full ArazzoSpec)
+      const parsedWorkflow = yaml.load(yamlContent) as import('../types/editor').ArazzoWorkflow;
+
+      // Preserve existing spec metadata or use defaults
+      const baseSpec = arazzoSpec || {
+        arazzo: '1.0.0',
+        info: {
+          title: 'Workflow',
+          description: '',
+          version: '1.0.0',
+        },
+        sourceDescriptions: [],
+        workflows: [],
+      };
+
+      // Reconstruct full spec with updated workflow
+      const newSpec: ArazzoSpec = {
+        arazzo: baseSpec.arazzo,
+        info: {
+          ...baseSpec.info,
+          title: parsedWorkflow.summary || baseSpec.info.title,
+          description: parsedWorkflow.description || baseSpec.info.description,
+        },
+        sourceDescriptions: baseSpec.sourceDescriptions,
+        workflows: [parsedWorkflow],
+      };
+
       set({
-        arazzoSpec: parsed,
+        arazzoSpec: newSpec,
         validationErrors: [],
         isValid: true,
         error: null,
         isDirty: true,
       });
-      // Validate with backend
-      void get().validateYaml(yamlContent);
+
+      // Validate with backend (still needs full spec)
+      const fullSpecYaml = yaml.dump(newSpec, {
+        indent: 2,
+        lineWidth: 100,
+        noRefs: true,
+      });
+      void get().validateYaml(fullSpecYaml);
     } catch (error) {
       set({
         error: `YAML parse error: ${(error as Error).message}`,
@@ -307,7 +339,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { arazzoSpec } = get();
     if (arazzoSpec) {
       try {
-        const yamlStr = yaml.dump(arazzoSpec, {
+        // Extract only workflows[0] for display
+        const workflowToEdit = arazzoSpec.workflows.length > 0
+          ? arazzoSpec.workflows[0]
+          : {
+              workflowId: 'workflow-1',
+              summary: 'New Workflow',
+              description: '',
+              steps: [],
+            };
+
+        const yamlStr = yaml.dump(workflowToEdit, {
           indent: 2,
           lineWidth: 100,
           noRefs: true,
