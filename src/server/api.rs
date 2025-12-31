@@ -1202,11 +1202,15 @@ pub async fn get_project_graph(
             )
         })?;
 
-    // Get first OpenAPI spec if available
-    let openapi = project.openapi_resolver.get_all_specs().values().next();
+    // Get resolver if it has any specs
+    let resolver = if project.openapi_resolver.get_all_specs().is_empty() {
+        None
+    } else {
+        Some(&project.openapi_resolver)
+    };
 
     // Build graph
-    let graph = build_flow_graph(workflow, openapi).map_err(|e| {
+    let graph = build_flow_graph(workflow, resolver).map_err(|e| {
         ProblemDetails::new(
             StatusCode::INTERNAL_SERVER_ERROR,
             "graph-build-failed",

@@ -8,8 +8,8 @@ pub mod k6;
 pub use k6::K6Converter;
 
 use crate::error::Result;
+use crate::loader::OpenApiResolver;
 use crate::models::arazzo::{ArazzoSpec, Workflow};
-use oas3::OpenApiV3Spec;
 
 /// Configuration options for converters
 #[derive(Debug, Clone, Default)]
@@ -33,7 +33,7 @@ pub trait Converter {
     fn convert_spec(
         &self,
         arazzo: &ArazzoSpec,
-        openapi: &OpenApiV3Spec,
+        resolver: &OpenApiResolver,
         options: &ConvertOptions,
     ) -> Result<Self::Output>;
 
@@ -41,7 +41,7 @@ pub trait Converter {
     fn convert_workflow(
         &self,
         workflow: &Workflow,
-        openapi: &OpenApiV3Spec,
+        resolver: &OpenApiResolver,
         options: &ConvertOptions,
     ) -> Result<Self::Output>;
 }

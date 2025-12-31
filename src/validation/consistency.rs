@@ -4,19 +4,19 @@ use super::operations::OperationValidator;
 use super::parameters::ParameterValidator;
 use super::schemas::SchemaValidator;
 use crate::error::Result;
+use crate::loader::OpenApiResolver;
 use crate::models::arazzo::ArazzoSpec;
-use oas3::OpenApiV3Spec;
 
 /// Main validator for Arazzo-OpenAPI consistency
 pub struct ArazzoOpenApiValidator<'a> {
     arazzo: &'a ArazzoSpec,
-    openapi: &'a OpenApiV3Spec,
+    resolver: &'a OpenApiResolver,
 }
 
 impl<'a> ArazzoOpenApiValidator<'a> {
     /// Create a new consistency validator
-    pub fn new(arazzo: &'a ArazzoSpec, openapi: &'a OpenApiV3Spec) -> Self {
-        Self { arazzo, openapi }
+    pub fn new(arazzo: &'a ArazzoSpec, resolver: &'a OpenApiResolver) -> Self {
+        Self { arazzo, resolver }
     }
 
     /// Validate all consistency checks
@@ -28,7 +28,7 @@ impl<'a> ArazzoOpenApiValidator<'a> {
         };
 
         // Phase 1: Basic operation reference checks
-        let op_validator = OperationValidator::new(self.arazzo, self.openapi);
+        let op_validator = OperationValidator::new(self.arazzo, self.resolver);
         let (op_errors, op_warnings) = op_validator.validate()?;
         result.errors.extend(op_errors);
         result.warnings.extend(op_warnings);
@@ -40,19 +40,19 @@ impl<'a> ArazzoOpenApiValidator<'a> {
         }
 
         // Phase 2: Parameter validation
-        let param_validator = ParameterValidator::new(self.arazzo, self.openapi);
+        let param_validator = ParameterValidator::new(self.arazzo, self.resolver);
         let (param_errors, param_warnings) = param_validator.validate()?;
         result.errors.extend(param_errors);
         result.warnings.extend(param_warnings);
 
         // Phase 3: Data dependency validation
-        let dep_validator = DataDependencyValidator::new(self.arazzo, self.openapi);
+        let dep_validator = DataDependencyValidator::new(self.arazzo, self.resolver);
         let (dep_errors, dep_warnings) = dep_validator.validate()?;
         result.errors.extend(dep_errors);
         result.warnings.extend(dep_warnings);
 
         // Phase 4: Schema validation (warnings only)
-        let schema_validator = SchemaValidator::new(self.arazzo, self.openapi);
+        let schema_validator = SchemaValidator::new(self.arazzo, self.resolver);
         let (schema_errors, schema_warnings) = schema_validator.validate()?;
         result.errors.extend(schema_errors);
         result.warnings.extend(schema_warnings);
@@ -77,6 +77,7 @@ pub struct ConsistencyValidationResult {
 pub struct ValidationError {
     pub workflow_id: Option<String>,
     pub step_id: Option<String>,
+    pub source_name: Option<String>,
     pub error_type: ErrorType,
     pub message: String,
     pub file_path: Option<String>,
@@ -88,6 +89,7 @@ impl ValidationError {
         Self {
             workflow_id: None,
             step_id: None,
+            source_name: None,
             error_type,
             message: message.into(),
             file_path: None,
@@ -105,6 +107,11 @@ impl ValidationError {
         self
     }
 
+    pub fn with_source(mut self, source_name: impl Into<String>) -> Self {
+        self.source_name = Some(source_name.into());
+        self
+    }
+
     pub fn with_location(mut self, file_path: impl Into<String>, line_number: usize) -> Self {
         self.file_path = Some(file_path.into());
         self.line_number = Some(line_number);
@@ -118,6 +125,11 @@ impl ValidationError {
         // File location
         if let (Some(path), Some(line)) = (&self.file_path, self.line_number) {
             parts.push(format!("{}:{}", path, line));
+        }
+
+        // Source name
+        if let Some(source) = &self.source_name {
+            parts.push(format!("[source: {}]", source));
         }
 
         // Workflow/step context

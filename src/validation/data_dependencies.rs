@@ -1,7 +1,7 @@
 use super::{ErrorType, ValidationError, ValidationWarning};
 use crate::error::Result;
+use crate::loader::OpenApiResolver;
 use crate::models::arazzo::ArazzoSpec;
-use oas3::OpenApiV3Spec;
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
 
@@ -9,12 +9,12 @@ use std::collections::{HashMap, HashSet};
 pub struct DataDependencyValidator<'a> {
     arazzo: &'a ArazzoSpec,
     #[allow(dead_code)]
-    openapi: &'a OpenApiV3Spec,
+    resolver: &'a OpenApiResolver,
 }
 
 impl<'a> DataDependencyValidator<'a> {
-    pub fn new(arazzo: &'a ArazzoSpec, openapi: &'a OpenApiV3Spec) -> Self {
-        Self { arazzo, openapi }
+    pub fn new(arazzo: &'a ArazzoSpec, resolver: &'a OpenApiResolver) -> Self {
+        Self { arazzo, resolver }
     }
 
     /// Validate data dependencies

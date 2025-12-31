@@ -126,9 +126,9 @@ run: ## CLIを実行（引数: ARGS="..."）
 
 # 例: make visualize ARGS="--format json"
 visualize: ## フロー図を生成（引数: ARGS="--format json"）
-	@cargo run -- visualize --root-dir $(ROOT_DIR) $(ARGS)
+	@cargo run -- visualize --arazzo $(ROOT_DIR)/arazzo.yaml $(ARGS)
 
 validate: ## OpenAPI/Arazzoを検証
 	@echo "$(BLUE)Validating OpenAPI and Arazzo...$(NC)"
-	@cargo run -- validate --root-dir $(ROOT_DIR)
+	@cargo run -- validate --arazzo $(ROOT_DIR)/arazzo.yaml
 	@echo "$(GREEN)✓ Validation passed$(NC)"

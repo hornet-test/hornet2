@@ -30,6 +30,13 @@ impl OpenApiResolver {
         Ok(())
     }
 
+    /// Load a single OpenAPI spec with an explicit name
+    pub fn load_spec(&mut self, name: &str, path: &Path) -> Result<()> {
+        let spec = crate::loader::load_openapi(path)?;
+        self.specs.insert(name.to_string(), spec);
+        Ok(())
+    }
+
     /// ファイルパスから名前を抽出
     fn extract_name(&self, path: &Path) -> String {
         path.file_stem()

@@ -1,19 +1,19 @@
 use super::operations::OperationValidator;
 use super::{ErrorType, ValidationError, ValidationWarning};
 use crate::error::Result;
+use crate::loader::OpenApiResolver;
 use crate::models::arazzo::ArazzoSpec;
-use oas3::OpenApiV3Spec;
 use oas3::spec::ObjectOrReference;
 
 /// Validator for parameter compatibility
 pub struct ParameterValidator<'a> {
     arazzo: &'a ArazzoSpec,
-    openapi: &'a OpenApiV3Spec,
+    resolver: &'a OpenApiResolver,
 }
 
 impl<'a> ParameterValidator<'a> {
-    pub fn new(arazzo: &'a ArazzoSpec, openapi: &'a OpenApiV3Spec) -> Self {
-        Self { arazzo, openapi }
+    pub fn new(arazzo: &'a ArazzoSpec, resolver: &'a OpenApiResolver) -> Self {
+        Self { arazzo, resolver }
     }
 
     /// Validate parameter compatibility
@@ -21,7 +21,7 @@ impl<'a> ParameterValidator<'a> {
         let mut errors = vec![];
         let mut warnings = vec![];
 
-        let op_validator = OperationValidator::new(self.arazzo, self.openapi);
+        let op_validator = OperationValidator::new(self.arazzo, self.resolver);
 
         for workflow in &self.arazzo.workflows {
             for step in &workflow.steps {

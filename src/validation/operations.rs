@@ -1,28 +1,24 @@
 use super::{ErrorType, ValidationError, ValidationWarning};
 use crate::error::Result;
+use crate::loader::OpenApiResolver;
 use crate::models::arazzo::{ArazzoSpec, Step};
-use oas3::OpenApiV3Spec;
 use oas3::spec::Operation;
-use std::collections::HashMap;
 
 /// Validator for operation references
 pub struct OperationValidator<'a> {
     arazzo: &'a ArazzoSpec,
-    openapi: &'a OpenApiV3Spec,
+    resolver: &'a OpenApiResolver,
 }
 
 impl<'a> OperationValidator<'a> {
-    pub fn new(arazzo: &'a ArazzoSpec, openapi: &'a OpenApiV3Spec) -> Self {
-        Self { arazzo, openapi }
+    pub fn new(arazzo: &'a ArazzoSpec, resolver: &'a OpenApiResolver) -> Self {
+        Self { arazzo, resolver }
     }
 
     /// Validate all operation references
     pub fn validate(&self) -> Result<(Vec<ValidationError>, Vec<ValidationWarning>)> {
         let mut errors = vec![];
         let warnings = vec![];
-
-        // Build operation cache for faster lookups
-        let op_cache = self.build_operation_cache();
 
         // Build workflow ID set for workflow reference checks
         let workflow_ids: std::collections::HashSet<_> = self
@@ -36,17 +32,20 @@ impl<'a> OperationValidator<'a> {
         for workflow in &self.arazzo.workflows {
             for step in &workflow.steps {
                 // Check operationId reference
-                if let Some(op_id) = &step.operation_id
-                    && !op_cache.contains_key(op_id.as_str())
-                {
-                    errors.push(
+                if let Some(op_id) = &step.operation_id {
+                    if let Some(op_ref) = self.resolver.find_operation(op_id) {
+                        // Operation found - optionally add source info to error context if needed
+                        let _ = op_ref.source_name; // Available for future use
+                    } else {
+                        errors.push(
                             ValidationError::new(
                                 ErrorType::OperationIdNotFound,
-                                format!("Operation not found: operationId '{}' does not exist in OpenAPI spec", op_id),
+                                format!("Operation not found: operationId '{}' does not exist in any OpenAPI source", op_id),
                             )
                             .with_workflow(&workflow.workflow_id)
                             .with_step(&step.step_id),
                         );
+                    }
                 }
 
                 // Check operationPath reference
@@ -56,7 +55,7 @@ impl<'a> OperationValidator<'a> {
                     errors.push(
                             ValidationError::new(
                                 ErrorType::OperationPathNotFound,
-                                format!("Operation not found: operationPath '{}' does not exist in OpenAPI spec", op_path),
+                                format!("Operation not found: operationPath '{}' does not exist in any OpenAPI source", op_path),
                             )
                             .with_workflow(&workflow.workflow_id)
                             .with_step(&step.step_id),
@@ -82,34 +81,6 @@ impl<'a> OperationValidator<'a> {
         Ok((errors, warnings))
     }
 
-    /// Build a cache of all operations by operationId
-    fn build_operation_cache(&self) -> HashMap<String, Operation> {
-        let mut cache = HashMap::new();
-
-        if let Some(paths) = &self.openapi.paths {
-            for (_path, path_item) in paths.iter() {
-                let operations = [
-                    &path_item.get,
-                    &path_item.post,
-                    &path_item.put,
-                    &path_item.delete,
-                    &path_item.patch,
-                    &path_item.options,
-                    &path_item.head,
-                    &path_item.trace,
-                ];
-
-                for op in operations.iter().copied().flatten() {
-                    if let Some(op_id) = &op.operation_id {
-                        cache.insert(op_id.clone(), op.clone());
-                    }
-                }
-            }
-        }
-
-        cache
-    }
-
     /// Check if an operationPath exists in the OpenAPI spec
     /// operationPath format: "{method} {path}" (e.g., "GET /users/{id}")
     fn find_operation_by_path(&self, operation_path: &str) -> bool {
@@ -119,34 +90,19 @@ impl<'a> OperationValidator<'a> {
             return false;
         }
 
-        let method = parts[0].to_uppercase();
+        let method = parts[0];
         let path = parts[1];
 
-        if let Some(paths) = &self.openapi.paths
-            && let Some(path_item) = paths.get(path)
-        {
-            let op_option = match method.as_str() {
-                "GET" => &path_item.get,
-                "POST" => &path_item.post,
-                "PUT" => &path_item.put,
-                "DELETE" => &path_item.delete,
-                "PATCH" => &path_item.patch,
-                "OPTIONS" => &path_item.options,
-                "HEAD" => &path_item.head,
-                "TRACE" => &path_item.trace,
-                _ => &None,
-            };
-
-            return op_option.is_some();
-        }
-
-        false
+        self.resolver
+            .find_operation_by_path_with_details(path, method)
+            .is_some()
     }
 
     /// Get operation by operationId (for use by other validators)
     pub fn get_operation_by_id(&self, operation_id: &str) -> Option<Operation> {
-        let cache = self.build_operation_cache();
-        cache.get(operation_id).cloned()
+        self.resolver
+            .find_operation_with_details(operation_id)
+            .map(|(_, op)| op)
     }
 
     /// Get operation by operationPath (for use by other validators)
@@ -156,28 +112,12 @@ impl<'a> OperationValidator<'a> {
             return None;
         }
 
-        let method = parts[0].to_uppercase();
+        let method = parts[0];
         let path = parts[1];
 
-        if let Some(paths) = &self.openapi.paths
-            && let Some(path_item) = paths.get(path)
-        {
-            let op_option = match method.as_str() {
-                "GET" => &path_item.get,
-                "POST" => &path_item.post,
-                "PUT" => &path_item.put,
-                "DELETE" => &path_item.delete,
-                "PATCH" => &path_item.patch,
-                "OPTIONS" => &path_item.options,
-                "HEAD" => &path_item.head,
-                "TRACE" => &path_item.trace,
-                _ => &None,
-            };
-
-            return op_option.as_ref().map(|op| (*op).clone());
-        }
-
-        None
+        self.resolver
+            .find_operation_by_path_with_details(path, method)
+            .map(|(_, op)| op)
     }
 
     /// Get operation from a step (helper method)
@@ -218,14 +158,21 @@ mod tests {
 
     #[test]
     fn test_validate_existing_operation_id() {
+        use crate::loader::OpenApiResolver;
+
         // Load fixtures
         let openapi_path = PathBuf::from("tests/fixtures/openapi.yaml");
         let arazzo_path = PathBuf::from("tests/fixtures/arazzo.yaml");
 
-        let openapi = loader::load_openapi(&openapi_path).expect("Failed to load OpenAPI");
         let arazzo = loader::load_arazzo(&arazzo_path).expect("Failed to load Arazzo");
 
-        let validator = OperationValidator::new(&arazzo, &openapi);
+        // Create resolver and load OpenAPI spec
+        let mut resolver = OpenApiResolver::new(PathBuf::from("tests/fixtures"));
+        resolver
+            .load_spec("userAPI", &openapi_path)
+            .expect("Failed to load OpenAPI");
+
+        let validator = OperationValidator::new(&arazzo, &resolver);
         let (errors, _warnings) = validator.validate().expect("Validation failed");
 
         // All operationIds in the fixture should be valid
@@ -244,9 +191,16 @@ mod tests {
 
     #[test]
     fn test_validate_missing_operation_id() {
+        use crate::loader::OpenApiResolver;
+
         // Load fixtures
         let openapi_path = PathBuf::from("tests/fixtures/openapi.yaml");
-        let openapi = loader::load_openapi(&openapi_path).expect("Failed to load OpenAPI");
+
+        // Create resolver and load OpenAPI spec
+        let mut resolver = OpenApiResolver::new(PathBuf::from("tests/fixtures"));
+        resolver
+            .load_spec("userAPI", &openapi_path)
+            .expect("Failed to load OpenAPI");
 
         // Create a minimal Arazzo with invalid operationId
         let arazzo_yaml = r#"
@@ -263,7 +217,7 @@ workflows:
 
         let arazzo: ArazzoSpec = serde_yaml::from_str(arazzo_yaml).expect("Failed to parse Arazzo");
 
-        let validator = OperationValidator::new(&arazzo, &openapi);
+        let validator = OperationValidator::new(&arazzo, &resolver);
         let (errors, _warnings) = validator.validate().expect("Validation failed");
 
         // Should have an operationId not found error
@@ -282,8 +236,15 @@ workflows:
 
     #[test]
     fn test_validate_workflow_reference() {
+        use crate::loader::OpenApiResolver;
+
         let openapi_path = PathBuf::from("tests/fixtures/openapi.yaml");
-        let openapi = loader::load_openapi(&openapi_path).expect("Failed to load OpenAPI");
+
+        // Create resolver and load OpenAPI spec
+        let mut resolver = OpenApiResolver::new(PathBuf::from("tests/fixtures"));
+        resolver
+            .load_spec("userAPI", &openapi_path)
+            .expect("Failed to load OpenAPI");
 
         // Create Arazzo with invalid workflowId reference
         let arazzo_yaml = r#"
@@ -300,7 +261,7 @@ workflows:
 
         let arazzo: ArazzoSpec = serde_yaml::from_str(arazzo_yaml).expect("Failed to parse Arazzo");
 
-        let validator = OperationValidator::new(&arazzo, &openapi);
+        let validator = OperationValidator::new(&arazzo, &resolver);
         let (errors, _warnings) = validator.validate().expect("Validation failed");
 
         // Should have a workflow ref not found error

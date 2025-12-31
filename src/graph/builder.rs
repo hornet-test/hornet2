@@ -1,6 +1,6 @@
 use super::{FlowEdge, FlowGraph, FlowNode};
 use crate::error::Result;
-use crate::models::OpenApiV3Spec;
+use crate::loader::OpenApiResolver;
 use crate::models::arazzo::{Step, Workflow};
 use regex::Regex;
 use std::collections::HashSet;
@@ -8,7 +8,7 @@ use std::collections::HashSet;
 /// Builder for constructing flow graphs from Arazzo workflows
 pub struct FlowGraphBuilder<'a> {
     workflow: &'a Workflow,
-    openapi: Option<&'a OpenApiV3Spec>,
+    resolver: Option<&'a OpenApiResolver>,
 }
 
 impl<'a> FlowGraphBuilder<'a> {
@@ -16,13 +16,13 @@ impl<'a> FlowGraphBuilder<'a> {
     pub fn new(workflow: &'a Workflow) -> Self {
         Self {
             workflow,
-            openapi: None,
+            resolver: None,
         }
     }
 
-    /// Set the OpenAPI specification (optional, for resolving operation details)
-    pub fn with_openapi(mut self, openapi: &'a OpenApiV3Spec) -> Self {
-        self.openapi = Some(openapi);
+    /// Set the OpenAPI resolver (optional, for resolving operation details)
+    pub fn with_resolver(mut self, resolver: &'a OpenApiResolver) -> Self {
+        self.resolver = Some(resolver);
         self
     }
 
@@ -39,10 +39,10 @@ impl<'a> FlowGraphBuilder<'a> {
                 let mut node = FlowNode::from_step(step);
 
                 // Resolve HTTP method from OpenAPI if available
-                if let Some(openapi) = self.openapi
+                if let Some(resolver) = self.resolver
                     && let Some(operation_id) = &step.operation_id
                 {
-                    node.method = self.resolve_method_by_operation_id(openapi, operation_id);
+                    node.method = self.resolve_method_by_operation_id(resolver, operation_id);
                 }
 
                 graph.add_node(node)
@@ -179,48 +179,23 @@ impl<'a> FlowGraphBuilder<'a> {
     /// Resolve HTTP method from OpenAPI by operation ID
     fn resolve_method_by_operation_id(
         &self,
-        openapi: &OpenApiV3Spec,
+        resolver: &OpenApiResolver,
         operation_id: &str,
     ) -> Option<String> {
-        if let Some(ref paths) = openapi.paths {
-            for (_path, path_item) in paths.iter() {
-                // Check all HTTP methods
-                if let Some(ref op) = path_item.get
-                    && op.operation_id.as_deref() == Some(operation_id)
-                {
-                    return Some("GET".to_string());
-                }
-                if let Some(ref op) = path_item.post
-                    && op.operation_id.as_deref() == Some(operation_id)
-                {
-                    return Some("POST".to_string());
-                }
-                if let Some(ref op) = path_item.put
-                    && op.operation_id.as_deref() == Some(operation_id)
-                {
-                    return Some("PUT".to_string());
-                }
-                if let Some(ref op) = path_item.delete
-                    && op.operation_id.as_deref() == Some(operation_id)
-                {
-                    return Some("DELETE".to_string());
-                }
-                if let Some(ref op) = path_item.patch
-                    && op.operation_id.as_deref() == Some(operation_id)
-                {
-                    return Some("PATCH".to_string());
-                }
-            }
-        }
-        None
+        resolver
+            .find_operation_with_details(operation_id)
+            .map(|(op_ref, _)| op_ref.method)
     }
 }
 
 /// Build a flow graph from a workflow
-pub fn build_flow_graph(workflow: &Workflow, openapi: Option<&OpenApiV3Spec>) -> Result<FlowGraph> {
+pub fn build_flow_graph(
+    workflow: &Workflow,
+    resolver: Option<&OpenApiResolver>,
+) -> Result<FlowGraph> {
     let mut builder = FlowGraphBuilder::new(workflow);
-    if let Some(spec) = openapi {
-        builder = builder.with_openapi(spec);
+    if let Some(r) = resolver {
+        builder = builder.with_resolver(r);
     }
     builder.build()
 }

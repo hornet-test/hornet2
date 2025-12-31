@@ -4,7 +4,7 @@ use hornet2::{
         exporter::{export_dot, export_json},
         validator::validate_flow_graph,
     },
-    loader::{load_arazzo, load_openapi},
+    loader::{OpenApiResolver, load_arazzo},
 };
 use std::path::Path;
 
@@ -28,10 +28,13 @@ fn test_build_graph_with_openapi() {
     let openapi_path = Path::new("tests/fixtures/openapi.yaml");
 
     let arazzo = load_arazzo(arazzo_path).unwrap();
-    let openapi = load_openapi(openapi_path).unwrap();
+
+    // Create resolver and load OpenAPI spec
+    let mut resolver = OpenApiResolver::new(Path::new("tests/fixtures"));
+    resolver.load_spec("userAPI", openapi_path).unwrap();
 
     let workflow = &arazzo.workflows[0];
-    let graph = build_flow_graph(workflow, Some(&openapi)).unwrap();
+    let graph = build_flow_graph(workflow, Some(&resolver)).unwrap();
 
     // Check that HTTP methods were resolved
     let register_node = graph.get_node("register").unwrap();
@@ -91,10 +94,13 @@ fn test_export_dot() {
     let openapi_path = Path::new("tests/fixtures/openapi.yaml");
 
     let arazzo = load_arazzo(arazzo_path).unwrap();
-    let openapi = load_openapi(openapi_path).unwrap();
+
+    // Create resolver and load OpenAPI spec
+    let mut resolver = OpenApiResolver::new(Path::new("tests/fixtures"));
+    resolver.load_spec("userAPI", openapi_path).unwrap();
 
     let workflow = &arazzo.workflows[0];
-    let graph = build_flow_graph(workflow, Some(&openapi)).unwrap();
+    let graph = build_flow_graph(workflow, Some(&resolver)).unwrap();
 
     let dot = export_dot(&graph);
 
@@ -118,10 +124,13 @@ fn test_export_json() {
     let openapi_path = Path::new("tests/fixtures/openapi.yaml");
 
     let arazzo = load_arazzo(arazzo_path).unwrap();
-    let openapi = load_openapi(openapi_path).unwrap();
+
+    // Create resolver and load OpenAPI spec
+    let mut resolver = OpenApiResolver::new(Path::new("tests/fixtures"));
+    resolver.load_spec("userAPI", openapi_path).unwrap();
 
     let workflow = &arazzo.workflows[0];
-    let graph = build_flow_graph(workflow, Some(&openapi)).unwrap();
+    let graph = build_flow_graph(workflow, Some(&resolver)).unwrap();
 
     let json = export_json(&graph).unwrap();
 

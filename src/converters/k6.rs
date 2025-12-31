@@ -3,10 +3,10 @@
 //! This module generates k6 JavaScript test scripts from Arazzo workflows.
 
 use crate::error::{HornetError, Result};
+use crate::loader::OpenApiResolver;
 use crate::models::arazzo::{ArazzoSpec, RequestBody, Step, SuccessCriteria, Workflow};
 
 use super::{ConvertOptions, Converter};
-use oas3::OpenApiV3Spec;
 use regex::Regex;
 use std::collections::HashMap;
 
@@ -20,40 +20,22 @@ impl K6Converter {
         Self
     }
 
-    /// Get the base URL from OpenAPI spec
-    fn get_base_url(openapi: &OpenApiV3Spec) -> String {
-        openapi
-            .servers
-            .first()
+    /// Get the base URL from first OpenAPI spec in resolver
+    fn get_base_url(resolver: &OpenApiResolver) -> String {
+        resolver
+            .get_all_specs()
+            .values()
+            .next()
+            .and_then(|spec| spec.servers.first())
             .map(|server| server.url.clone())
             .unwrap_or_else(|| "http://localhost:8080".to_string())
     }
 
-    /// Find operation info (path and method) by operationId
-    fn find_operation(openapi: &OpenApiV3Spec, operation_id: &str) -> Option<(String, String)> {
-        if let Some(paths) = &openapi.paths {
-            for (path, path_item) in paths.iter() {
-                let operations = [
-                    ("GET", &path_item.get),
-                    ("POST", &path_item.post),
-                    ("PUT", &path_item.put),
-                    ("DELETE", &path_item.delete),
-                    ("PATCH", &path_item.patch),
-                    ("HEAD", &path_item.head),
-                    ("OPTIONS", &path_item.options),
-                ];
-
-                for (method, op_opt) in operations.iter() {
-                    if let Some(op) = op_opt
-                        && let Some(ref op_id) = op.operation_id
-                        && op_id == operation_id
-                    {
-                        return Some((path.clone(), method.to_string()));
-                    }
-                }
-            }
-        }
-        None
+    /// Find operation info (path and method) by operationId using resolver
+    fn find_operation(resolver: &OpenApiResolver, operation_id: &str) -> Option<(String, String)> {
+        resolver
+            .find_operation(operation_id)
+            .map(|op_ref| (op_ref.path, op_ref.method))
     }
 
     /// Convert a JSON value to JavaScript code
@@ -195,7 +177,7 @@ impl K6Converter {
     fn generate_step(
         &self,
         step: &Step,
-        openapi: &OpenApiV3Spec,
+        resolver: &OpenApiResolver,
         base_url: &str,
     ) -> Result<String> {
         let mut lines = Vec::new();
@@ -204,7 +186,7 @@ impl K6Converter {
         lines.push(self.generate_step_comment(step));
 
         // Get operation info
-        let (path, method) = self.get_operation_info(step, openapi)?;
+        let (path, method) = self.get_operation_info(step, resolver)?;
 
         // Build URL
         let final_url = self.build_url(base_url, &path, &step.parameters);
@@ -259,9 +241,13 @@ impl K6Converter {
         }
     }
 
-    fn get_operation_info(&self, step: &Step, openapi: &OpenApiV3Spec) -> Result<(String, String)> {
+    fn get_operation_info(
+        &self,
+        step: &Step,
+        resolver: &OpenApiResolver,
+    ) -> Result<(String, String)> {
         if let Some(ref op_id) = step.operation_id {
-            Self::find_operation(openapi, op_id).ok_or_else(|| {
+            Self::find_operation(resolver, op_id).ok_or_else(|| {
                 HornetError::OperationNotFound(format!("Operation '{}' not found", op_id))
             })
         } else if let Some(ref op_path) = step.operation_path {
@@ -555,7 +541,7 @@ impl K6Converter {
     fn generate_workflow_with_branching(
         &self,
         workflow: &Workflow,
-        openapi: &OpenApiV3Spec,
+        resolver: &OpenApiResolver,
         base_url: &str,
     ) -> Result<String> {
         let mut lines = Vec::new();
@@ -573,7 +559,7 @@ impl K6Converter {
             lines.push(format!("function {}(inputs) {{", func_name));
 
             // Generate step code
-            let step_code = self.generate_step(step, openapi, base_url)?;
+            let step_code = self.generate_step(step, resolver, base_url)?;
             lines.push(step_code);
 
             // Return response variable for conditional logic
@@ -996,7 +982,7 @@ impl Converter for K6Converter {
     fn convert_spec(
         &self,
         arazzo: &ArazzoSpec,
-        openapi: &OpenApiV3Spec,
+        resolver: &OpenApiResolver,
         options: &ConvertOptions,
     ) -> Result<Self::Output> {
         if arazzo.workflows.is_empty() {
@@ -1005,14 +991,14 @@ impl Converter for K6Converter {
 
         // If only one workflow, generate it directly
         if arazzo.workflows.len() == 1 {
-            return self.convert_workflow(&arazzo.workflows[0], openapi, options);
+            return self.convert_workflow(&arazzo.workflows[0], resolver, options);
         }
 
         // For multiple workflows, combine them into one script with separate functions
         let base_url = options
             .base_url
             .clone()
-            .unwrap_or_else(|| Self::get_base_url(openapi));
+            .unwrap_or_else(|| Self::get_base_url(resolver));
 
         let mut lines = Vec::new();
 
@@ -1057,7 +1043,7 @@ impl Converter for K6Converter {
                     lines.push(format!("function {}(inputs) {{", step_func_name));
 
                     // Generate step code
-                    let step_code = self.generate_step(step, openapi, &base_url)?;
+                    let step_code = self.generate_step(step, resolver, &base_url)?;
                     lines.push(step_code);
 
                     // Return response variable for conditional logic
@@ -1095,7 +1081,7 @@ impl Converter for K6Converter {
 
                 // Generate steps
                 for step in &workflow.steps {
-                    let step_code = self.generate_step(step, openapi, &base_url)?;
+                    let step_code = self.generate_step(step, resolver, &base_url)?;
                     lines.push(step_code);
                 }
 
@@ -1119,13 +1105,13 @@ impl Converter for K6Converter {
     fn convert_workflow(
         &self,
         workflow: &Workflow,
-        openapi: &OpenApiV3Spec,
+        resolver: &OpenApiResolver,
         options: &ConvertOptions,
     ) -> Result<Self::Output> {
         let base_url = options
             .base_url
             .clone()
-            .unwrap_or_else(|| Self::get_base_url(openapi));
+            .unwrap_or_else(|| Self::get_base_url(resolver));
 
         let mut lines = Vec::new();
 
@@ -1155,7 +1141,7 @@ impl Converter for K6Converter {
 
         if has_branching {
             // Generate workflow with conditional branching support
-            lines.push(self.generate_workflow_with_branching(workflow, openapi, &base_url)?);
+            lines.push(self.generate_workflow_with_branching(workflow, resolver, &base_url)?);
         } else {
             // Generate simple sequential workflow
             lines.push("export default function () {".to_string());
@@ -1166,7 +1152,7 @@ impl Converter for K6Converter {
 
             // Generate steps
             for step in &workflow.steps {
-                let step_code = self.generate_step(step, openapi, &base_url)?;
+                let step_code = self.generate_step(step, resolver, &base_url)?;
                 lines.push(step_code);
             }
 
@@ -1182,7 +1168,7 @@ impl Converter for K6Converter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::loader::{arazzo::load_arazzo, openapi::load_openapi};
+    use crate::loader::arazzo::load_arazzo;
 
     #[test]
     fn test_convert_runtime_expr() {
@@ -1258,13 +1244,21 @@ mod tests {
 
     #[test]
     fn test_convert_workflow_integration() {
+        use crate::loader::OpenApiResolver;
+        use std::path::Path;
+
         let arazzo = load_arazzo("tests/fixtures/arazzo.yaml").unwrap();
-        let openapi = load_openapi("tests/fixtures/openapi.yaml").unwrap();
+
+        // Create resolver and load OpenAPI spec
+        let mut resolver = OpenApiResolver::new(Path::new("tests/fixtures"));
+        resolver
+            .load_spec("userAPI", Path::new("tests/fixtures/openapi.yaml"))
+            .unwrap();
 
         let converter = K6Converter::new();
         let options = ConvertOptions::default();
 
-        let result = converter.convert_workflow(&arazzo.workflows[0], &openapi, &options);
+        let result = converter.convert_workflow(&arazzo.workflows[0], &resolver, &options);
         assert!(result.is_ok());
 
         let script = result.unwrap();

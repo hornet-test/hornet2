@@ -1,102 +1,77 @@
 use crate::{
-    HornetError, Result,
+    Result,
     graph::{builder::build_flow_graph, validator::validate_flow_graph},
-    loader,
+    loader::{self, SourceDescriptionResolver},
 };
 use colored::*;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-pub fn execute_validate(
-    root_dir: &Option<PathBuf>,
-    openapi_path: &Option<PathBuf>,
-    arazzo_path: &Option<PathBuf>,
-) -> Result<()> {
-    // Determine file paths
-    let (openapi_file, arazzo_file) = if let Some(root) = root_dir {
-        // Single-project mode
-        let openapi = root.join("openapi.yaml");
-        let arazzo = root.join("arazzo.yaml");
-
-        if !openapi.exists() {
-            return Err(HornetError::InvalidPath(format!(
-                "openapi.yaml not found in {}",
-                root.display()
-            )));
-        }
-        if !arazzo.exists() {
-            return Err(HornetError::InvalidPath(format!(
-                "arazzo.yaml not found in {}",
-                root.display()
-            )));
-        }
-
-        (openapi, arazzo)
-    } else if let (Some(openapi), Some(arazzo)) = (openapi_path, arazzo_path) {
-        // Individual file mode
-        (openapi.clone(), arazzo.clone())
-    } else {
-        return Err(HornetError::ValidationError(
-            "Either --root-dir or both --openapi and --arazzo must be specified".to_string(),
-        ));
-    };
-
-    validate_files(&openapi_file, &arazzo_file)
-}
-
-fn validate_files(openapi_path: &Path, arazzo_path: &Path) -> Result<()> {
+pub fn execute_validate(arazzo_path: &PathBuf) -> Result<()> {
     let mut has_errors = false;
 
-    // Validate OpenAPI
-    println!("{}", "Validating OpenAPI file...".bright_blue());
-    println!("  Path: {}", openapi_path.display());
-
-    let openapi = match loader::load_openapi(openapi_path.to_str().unwrap()) {
-        Ok(spec) => {
-            println!("{}", "✓ OpenAPI is valid".green());
-            println!("  Title: {}", spec.info.title.bold());
-            println!("  Version: {}", spec.info.version);
-            println!("  OpenAPI Version: {}", spec.openapi);
-            let path_count = spec.paths.as_ref().map(|p| p.len()).unwrap_or(0);
-            println!("  Paths: {}", path_count);
-            println!();
-            Some(spec)
-        }
-        Err(e) => {
-            println!("{}", "✗ OpenAPI validation failed".red().bold());
-            println!("  {}", e.to_string().red());
-            has_errors = true;
-            println!();
-            None
-        }
-    };
-
-    // Validate Arazzo
+    // Validate Arazzo file
     println!("{}", "Validating Arazzo file...".bright_blue());
     println!("  Path: {}", arazzo_path.display());
 
-    let arazzo = match loader::load_arazzo(arazzo_path.to_str().unwrap()) {
+    let arazzo = match loader::load_arazzo(arazzo_path) {
         Ok(spec) => {
-            println!("{}", "✓ Arazzo is valid".green());
+            println!("{}", "✓ Arazzo structure is valid".green());
             println!("  Title: {}", spec.info.title.bold());
             println!("  Version: {}", spec.info.version);
             println!("  Arazzo Version: {}", spec.arazzo);
             println!("  Workflows: {}", spec.workflows.len());
+            println!("  Source Descriptions: {}", spec.source_descriptions.len());
             println!();
-            Some(spec)
+            spec
         }
         Err(e) => {
             println!("{}", "✗ Arazzo validation failed".red().bold());
             println!("  {}", e.to_string().red());
-            has_errors = true;
             println!();
-            None
+            return Err(e);
         }
     };
 
+    // Load OpenAPI sources from sourceDescriptions
+    println!(
+        "{}",
+        "Loading OpenAPI sources from sourceDescriptions...".bright_blue()
+    );
+    let resolver_helper = SourceDescriptionResolver::new(arazzo_path)?;
+    let source_result = resolver_helper.load_sources(&arazzo.source_descriptions);
+
+    // Report source loading errors
+    if !source_result.errors.is_empty() {
+        println!("{}", "⚠️  Source Loading Errors:".yellow().bold());
+        for err in &source_result.errors {
+            println!(
+                "  - Source '{}' ({}): {}",
+                err.name.yellow(),
+                err.url,
+                err.message.red()
+            );
+            has_errors = true;
+        }
+        println!();
+    }
+
+    // Validate each OpenAPI source
+    if !source_result.resolver.get_all_specs().is_empty() {
+        println!("{}", "Validating OpenAPI sources...".bright_blue());
+        for (name, spec) in source_result.resolver.get_all_specs() {
+            println!("  Source '{}': {}", name.cyan(), "✓ Valid".green());
+            println!("    Title: {}", spec.info.title.bold());
+            println!("    Version: {}", spec.info.version);
+            let path_count = spec.paths.as_ref().map(|p| p.len()).unwrap_or(0);
+            println!("    Paths: {}", path_count);
+        }
+        println!();
+    }
+
     // Validate Arazzo-OpenAPI consistency
-    if let (Some(arazzo), Some(openapi)) = (&arazzo, &openapi) {
+    if !source_result.resolver.get_all_specs().is_empty() {
         println!(
             "{}",
             "Validating Arazzo-OpenAPI consistency...".bright_blue()
@@ -104,7 +79,7 @@ fn validate_files(openapi_path: &Path, arazzo_path: &Path) -> Result<()> {
 
         use crate::validation::ArazzoOpenApiValidator;
 
-        let validator = ArazzoOpenApiValidator::new(arazzo, openapi);
+        let validator = ArazzoOpenApiValidator::new(&arazzo, &source_result.resolver);
 
         match validator.validate_all() {
             Ok(result) => {
@@ -113,28 +88,28 @@ fn validate_files(openapi_path: &Path, arazzo_path: &Path) -> Result<()> {
 
                 // Display errors
                 if !result.errors.is_empty() {
-                    println!("    {}", "✗ Consistency Errors:".red().bold());
+                    println!("  {}", "✗ Consistency Errors:".red().bold());
                     for error in &result.errors {
-                        println!("      - {}", error.format().red());
+                        println!("    - {}", error.format().red());
                     }
                     has_errors = true;
                 }
 
                 // Display warnings
                 if !result.warnings.is_empty() {
-                    println!("    {}", "⚠ Consistency Warnings:".yellow());
+                    println!("  {}", "⚠ Consistency Warnings:".yellow());
                     for warning in &result.warnings {
-                        println!("      - {}", warning.format().yellow());
+                        println!("    - {}", warning.format().yellow());
                     }
                 }
 
                 if result.errors.is_empty() && result.warnings.is_empty() {
-                    println!("    {}", "✓ Consistency checks passed".green());
+                    println!("  {}", "✓ Consistency checks passed".green());
                 }
             }
             Err(e) => {
-                println!("    {}", "✗ Consistency validation failed".red().bold());
-                println!("      {}", e.to_string().red());
+                println!("  {}", "✗ Consistency validation failed".red().bold());
+                println!("    {}", e.to_string().red());
                 has_errors = true;
             }
         }
@@ -142,49 +117,53 @@ fn validate_files(openapi_path: &Path, arazzo_path: &Path) -> Result<()> {
     }
 
     // Validate workflows (graph structure)
-    if let Some(arazzo) = arazzo {
-        println!("{}", "Validating workflow graphs...".bright_blue());
+    println!("{}", "Validating workflow graphs...".bright_blue());
 
-        for workflow in &arazzo.workflows {
-            println!("  Workflow: {}", workflow.workflow_id.cyan());
+    for workflow in &arazzo.workflows {
+        println!("  Workflow: {}", workflow.workflow_id.cyan());
 
-            match build_flow_graph(workflow, openapi.as_ref()) {
-                Ok(graph) => match validate_flow_graph(&graph) {
-                    Ok(validation) => {
-                        if validation.is_ok() {
-                            println!("    {}", "✓ Graph is valid".green());
-                        } else {
-                            if !validation.warnings.is_empty() {
-                                println!("    {}", "⚠ Warnings:".yellow());
-                                for warning in &validation.warnings {
-                                    println!("      - {}", warning.yellow());
-                                }
-                            }
+        let resolver = if source_result.resolver.get_all_specs().is_empty() {
+            None
+        } else {
+            Some(&source_result.resolver)
+        };
 
-                            if !validation.errors.is_empty() {
-                                println!("    {}", "✗ Errors:".red().bold());
-                                for error in &validation.errors {
-                                    println!("      - {}", error.red());
-                                }
-                                has_errors = true;
+        match build_flow_graph(workflow, resolver) {
+            Ok(graph) => match validate_flow_graph(&graph) {
+                Ok(validation) => {
+                    if validation.is_ok() {
+                        println!("    {}", "✓ Graph is valid".green());
+                    } else {
+                        if !validation.warnings.is_empty() {
+                            println!("    {}", "⚠ Warnings:".yellow());
+                            for warning in &validation.warnings {
+                                println!("      - {}", warning.yellow());
                             }
                         }
+
+                        if !validation.errors.is_empty() {
+                            println!("    {}", "✗ Errors:".red().bold());
+                            for error in &validation.errors {
+                                println!("      - {}", error.red());
+                            }
+                            has_errors = true;
+                        }
                     }
-                    Err(e) => {
-                        println!("    {}", "✗ Validation failed".red().bold());
-                        println!("      {}", e.to_string().red());
-                        has_errors = true;
-                    }
-                },
+                }
                 Err(e) => {
-                    println!("    {}", "✗ Failed to build graph".red().bold());
+                    println!("    {}", "✗ Validation failed".red().bold());
                     println!("      {}", e.to_string().red());
                     has_errors = true;
                 }
+            },
+            Err(e) => {
+                println!("    {}", "✗ Failed to build graph".red().bold());
+                println!("      {}", e.to_string().red());
+                has_errors = true;
             }
         }
-        println!();
     }
+    println!();
 
     // Summary
     if has_errors {

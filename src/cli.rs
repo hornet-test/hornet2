@@ -19,34 +19,18 @@ pub enum Commands {
         arazzo: PathBuf,
     },
 
-    /// Validate OpenAPI and Arazzo files
+    /// Validate Arazzo file (OpenAPI paths from sourceDescriptions)
     Validate {
-        /// Root directory containing openapi.yaml and arazzo.yaml (single-project mode)
-        #[arg(short, long, conflicts_with_all = ["openapi", "arazzo"])]
-        root_dir: Option<PathBuf>,
-
-        /// Path to OpenAPI file
-        #[arg(short, long, requires = "arazzo")]
-        openapi: Option<PathBuf>,
-
         /// Path to Arazzo file
-        #[arg(short, long, requires = "openapi")]
-        arazzo: Option<PathBuf>,
+        #[arg(short, long)]
+        arazzo: PathBuf,
     },
 
     /// Visualize workflow as a graph
     Visualize {
-        /// Root directory containing openapi.yaml and arazzo.yaml (single-project mode)
-        #[arg(short, long, conflicts_with_all = ["openapi", "arazzo"])]
-        root_dir: Option<PathBuf>,
-
         /// Path to Arazzo file
         #[arg(short, long)]
-        arazzo: Option<PathBuf>,
-
-        /// Path to OpenAPI file (optional)
-        #[arg(short, long)]
-        openapi: Option<PathBuf>,
+        arazzo: PathBuf,
 
         /// Output format
         #[arg(short, long, default_value = "dot")]
@@ -77,10 +61,6 @@ pub enum Commands {
         /// Path to Arazzo file
         #[arg(short, long)]
         arazzo: PathBuf,
-
-        /// Path to OpenAPI file
-        #[arg(short, long)]
-        openapi: PathBuf,
 
         /// Target format (k6)
         #[arg(short, long, default_value = "k6")]
@@ -116,10 +96,6 @@ pub enum Commands {
         /// Path to Arazzo file
         #[arg(short, long)]
         arazzo: PathBuf,
-
-        /// Path to OpenAPI file
-        #[arg(short, long)]
-        openapi: PathBuf,
 
         /// Test engine to use (k6)
         #[arg(short, long, default_value = "k6")]

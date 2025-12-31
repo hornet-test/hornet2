@@ -4,7 +4,7 @@
 
 use crate::converters::{ConvertOptions, Converter, K6Converter};
 use crate::error::Result;
-use crate::loader::{arazzo::load_arazzo, openapi::load_openapi};
+use crate::loader::{SourceDescriptionResolver, arazzo::load_arazzo};
 use colored::Colorize;
 use std::fs;
 use std::path::Path;
@@ -12,7 +12,6 @@ use std::path::Path;
 /// `execute_convert` に渡す引数をまとめた構造体
 pub struct ConvertCommandArgs<'a> {
     pub arazzo_path: &'a Path,
-    pub openapi_path: &'a Path,
     pub output_path: Option<&'a Path>,
     pub target: &'a str,
     pub workflow_id: Option<&'a str>,
@@ -25,7 +24,6 @@ pub struct ConvertCommandArgs<'a> {
 /// `execute_run` に渡す引数をまとめた構造体
 pub struct RunCommandArgs<'a> {
     pub arazzo_path: &'a Path,
-    pub openapi_path: &'a Path,
     pub engine: &'a str,
     pub workflow_id: Option<&'a str>,
     pub base_url: Option<&'a str>,
@@ -38,7 +36,6 @@ pub struct RunCommandArgs<'a> {
 pub fn execute_convert(args: ConvertCommandArgs<'_>) -> Result<()> {
     let ConvertCommandArgs {
         arazzo_path,
-        openapi_path,
         output_path,
         target,
         workflow_id,
@@ -56,12 +53,28 @@ pub fn execute_convert(args: ConvertCommandArgs<'_>) -> Result<()> {
         arazzo_path.display()
     );
 
-    // OpenAPIファイルを読み込む
-    let openapi = load_openapi(openapi_path)?;
+    // Load OpenAPI sources from sourceDescriptions
+    let resolver_helper = SourceDescriptionResolver::new(arazzo_path)?;
+    let source_result = resolver_helper.load_sources(&arazzo.source_descriptions);
+
+    // Report source loading errors
+    if !source_result.errors.is_empty() {
+        eprintln!("{}", "⚠️  Some OpenAPI sources failed to load:".yellow());
+        for err in &source_result.errors {
+            eprintln!("  - Source '{}': {}", err.name, err.message);
+        }
+    }
+
+    if source_result.resolver.get_all_specs().is_empty() {
+        return Err(crate::error::HornetError::ValidationError(
+            "No OpenAPI sources loaded successfully".to_string(),
+        ));
+    }
+
     eprintln!(
-        "{} Loaded OpenAPI file: {}",
+        "{} Loaded {} OpenAPI source(s)",
         "✓".green(),
-        openapi_path.display()
+        source_result.resolver.get_all_specs().len()
     );
 
     // 変換オプションを組み立てる
@@ -90,10 +103,10 @@ pub fn execute_convert(args: ConvertCommandArgs<'_>) -> Result<()> {
                         ))
                     })?;
 
-                converter.convert_workflow(workflow, &openapi, &options)?
+                converter.convert_workflow(workflow, &source_result.resolver, &options)?
             } else {
                 // 全ワークフローを変換
-                converter.convert_spec(&arazzo, &openapi, &options)?
+                converter.convert_spec(&arazzo, &source_result.resolver, &options)?
             }
         }
         _ => {
@@ -124,7 +137,6 @@ pub fn execute_convert(args: ConvertCommandArgs<'_>) -> Result<()> {
 pub fn execute_run(args: RunCommandArgs<'_>) -> Result<()> {
     let RunCommandArgs {
         arazzo_path,
-        openapi_path,
         engine,
         workflow_id,
         base_url,
@@ -140,7 +152,23 @@ pub fn execute_run(args: RunCommandArgs<'_>) -> Result<()> {
 
     // 入力ファイルを読み込む
     let arazzo = load_arazzo(arazzo_path)?;
-    let openapi = load_openapi(openapi_path)?;
+
+    // Load OpenAPI sources from sourceDescriptions
+    let resolver_helper = SourceDescriptionResolver::new(arazzo_path)?;
+    let source_result = resolver_helper.load_sources(&arazzo.source_descriptions);
+
+    if !source_result.errors.is_empty() {
+        eprintln!("{}", "⚠️  Some OpenAPI sources failed to load:".yellow());
+        for err in &source_result.errors {
+            eprintln!("  - Source '{}': {}", err.name, err.message);
+        }
+    }
+
+    if source_result.resolver.get_all_specs().is_empty() {
+        return Err(crate::error::HornetError::ValidationError(
+            "No OpenAPI sources loaded successfully".to_string(),
+        ));
+    }
 
     let options = ConvertOptions {
         base_url: base_url.map(|s| s.to_string()),
@@ -175,10 +203,14 @@ pub fn execute_run(args: RunCommandArgs<'_>) -> Result<()> {
                             wf_id
                         ))
                     })?;
-                converter.convert_workflow(workflow, &openapi, &options)?
+                converter.convert_workflow(workflow, &source_result.resolver, &options)?
             } else {
                 // ワークフロー未指定時は先頭を使用
-                converter.convert_workflow(&arazzo.workflows[0], &openapi, &options)?
+                converter.convert_workflow(
+                    &arazzo.workflows[0],
+                    &source_result.resolver,
+                    &options,
+                )?
             };
 
             println!("{} Running tests with k6...\n", "→".blue());

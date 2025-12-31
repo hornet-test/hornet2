@@ -217,14 +217,14 @@ async fn validate_and_publish(
         }
     };
 
-    // Get OpenAPI spec
-    let openapi = match workspace_manager.get_openapi_for_project(&project) {
-        Ok(o) => o,
-        Err(e) => {
+    // Get OpenAPI resolver
+    let resolver = match workspace_manager.get_resolver_for_document(uri) {
+        Some(r) => r,
+        None => {
             client
                 .log_message(
                     tower_lsp::lsp_types::MessageType::ERROR,
-                    format!("Failed to load OpenAPI: {}", e),
+                    format!("Failed to load OpenAPI resolver for {}", uri),
                 )
                 .await;
             return Ok(());
@@ -232,7 +232,7 @@ async fn validate_and_publish(
     };
 
     // Run validation
-    let validator = ArazzoOpenApiValidator::new(&project.arazzo_spec, &openapi);
+    let validator = ArazzoOpenApiValidator::new(&project.arazzo_spec, &resolver);
     let result = match validator.validate_all() {
         Ok(result) => result,
         Err(e) => {

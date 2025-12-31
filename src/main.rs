@@ -13,21 +13,15 @@ async fn main() -> Result<()> {
         Commands::List { arazzo } => {
             commands::execute_list(&arazzo)?;
         }
-        Commands::Validate {
-            root_dir,
-            openapi,
-            arazzo,
-        } => {
-            commands::execute_validate(&root_dir, &openapi, &arazzo)?;
+        Commands::Validate { arazzo } => {
+            commands::execute_validate(&arazzo)?;
         }
         Commands::Visualize {
-            root_dir,
             arazzo,
-            openapi,
             format,
             output,
         } => {
-            commands::execute_visualize(&root_dir, &arazzo, &openapi, &format, &output)?;
+            commands::execute_visualize(&arazzo, &format, &output)?;
         }
         Commands::Serve {
             root_dir,
@@ -38,7 +32,6 @@ async fn main() -> Result<()> {
         }
         Commands::Convert {
             arazzo,
-            openapi,
             to,
             output,
             workflow,
@@ -49,7 +42,6 @@ async fn main() -> Result<()> {
         } => {
             commands::execute_convert(commands::ConvertCommandArgs {
                 arazzo_path: &arazzo,
-                openapi_path: &openapi,
                 output_path: output.as_deref(),
                 target: &to,
                 workflow_id: workflow.as_deref(),
@@ -61,7 +53,6 @@ async fn main() -> Result<()> {
         }
         Commands::Run {
             arazzo,
-            openapi,
             engine,
             workflow,
             base_url,
@@ -71,7 +62,6 @@ async fn main() -> Result<()> {
         } => {
             commands::execute_run(commands::RunCommandArgs {
                 arazzo_path: &arazzo,
-                openapi_path: &openapi,
                 engine: &engine,
                 workflow_id: workflow.as_deref(),
                 base_url: base_url.as_deref(),

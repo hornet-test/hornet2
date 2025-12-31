@@ -1,19 +1,19 @@
 use super::{ValidationError, ValidationWarning};
 use crate::error::Result;
+use crate::loader::OpenApiResolver;
 use crate::models::arazzo::ArazzoSpec;
-use oas3::OpenApiV3Spec;
 
 /// Validator for schema compatibility (warnings only)
 pub struct SchemaValidator<'a> {
     #[allow(dead_code)]
     arazzo: &'a ArazzoSpec,
     #[allow(dead_code)]
-    openapi: &'a OpenApiV3Spec,
+    resolver: &'a OpenApiResolver,
 }
 
 impl<'a> SchemaValidator<'a> {
-    pub fn new(arazzo: &'a ArazzoSpec, openapi: &'a OpenApiV3Spec) -> Self {
-        Self { arazzo, openapi }
+    pub fn new(arazzo: &'a ArazzoSpec, resolver: &'a OpenApiResolver) -> Self {
+        Self { arazzo, resolver }
     }
 
     /// Validate schema compatibility
