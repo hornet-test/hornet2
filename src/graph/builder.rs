@@ -306,12 +306,12 @@ mod tests {
     fn test_branching_workflow() {
         use crate::graph::EdgeType;
         use crate::models::arazzo::{FailureAction, SuccessAction};
-        use std::collections::HashMap;
+        use indexmap::IndexMap;
 
-        let mut success_config = HashMap::new();
+        let mut success_config = IndexMap::new();
         success_config.insert("stepId".to_string(), serde_json::json!("step3"));
 
-        let mut failure_config = HashMap::new();
+        let mut failure_config = IndexMap::new();
         failure_config.insert("stepId".to_string(), serde_json::json!("step2"));
 
         let workflow = Workflow {

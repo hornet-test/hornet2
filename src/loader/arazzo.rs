@@ -207,4 +207,108 @@ workflows:
         assert_eq!(saved_spec.workflows.len(), 1);
         assert_eq!(saved_spec.workflows[0].workflow_id, "test-flow");
     }
+
+    #[test]
+    fn test_save_preserves_field_order() {
+        use indexmap::IndexMap;
+
+        // Create spec with extensions in specific order
+        let mut extensions = IndexMap::new();
+        // Add extensions in specific order (alphabetically reversed)
+        extensions.insert("x-zebra".to_string(), serde_json::json!("last"));
+        extensions.insert("x-middle".to_string(), serde_json::json!("middle"));
+        extensions.insert("x-alpha".to_string(), serde_json::json!("first"));
+
+        let workflow = crate::models::arazzo::Workflow {
+            workflow_id: "test".to_string(),
+            summary: Some("Test workflow".to_string()),
+            description: None,
+            inputs: None,
+            steps: vec![crate::models::arazzo::Step {
+                step_id: "step1".to_string(),
+                description: None,
+                operation_id: Some("testOp".to_string()),
+                operation_path: None,
+                workflow_id: None,
+                parameters: vec![],
+                request_body: None,
+                success_criteria: None,
+                on_success: None,
+                on_failure: None,
+                outputs: None,
+            }],
+            success_criteria: None,
+            outputs: None,
+            extensions,
+        };
+
+        let spec = crate::models::arazzo::ArazzoSpec {
+            arazzo: "1.0.0".to_string(),
+            info: crate::models::arazzo::Info {
+                title: "Order Test".to_string(),
+                summary: None,
+                description: None,
+                version: "1.0.0".to_string(),
+            },
+            source_descriptions: vec![],
+            workflows: vec![workflow],
+            components: None,
+        };
+
+        // Save and check order
+        let output_file = NamedTempFile::new().unwrap();
+        let output_path = output_file.path().to_path_buf();
+        save_arazzo(&output_path, &spec).unwrap();
+
+        // Verify order in YAML (should be insertion order, not alphabetical)
+        let yaml = std::fs::read_to_string(&output_path).unwrap();
+        let zebra_pos = yaml.find("x-zebra").unwrap();
+        let middle_pos = yaml.find("x-middle").unwrap();
+        let alpha_pos = yaml.find("x-alpha").unwrap();
+
+        assert!(
+            zebra_pos < middle_pos,
+            "x-zebra should come before x-middle"
+        );
+        assert!(
+            middle_pos < alpha_pos,
+            "x-middle should come before x-alpha"
+        );
+
+        // Verify round-trip preserves order
+        let loaded = load_arazzo(&output_path).unwrap();
+        let keys: Vec<_> = loaded.workflows[0].extensions.keys().cloned().collect();
+        assert_eq!(keys, vec!["x-zebra", "x-middle", "x-alpha"]);
+    }
+
+    #[test]
+    fn test_structural_field_order() {
+        // Verify top-level fields appear in expected order
+        let spec = crate::models::arazzo::ArazzoSpec {
+            arazzo: "1.0.0".to_string(),
+            info: crate::models::arazzo::Info {
+                title: "Test".to_string(),
+                summary: None,
+                description: None,
+                version: "1.0.0".to_string(),
+            },
+            source_descriptions: vec![],
+            workflows: vec![],
+            components: None,
+        };
+
+        let output_file = NamedTempFile::new().unwrap();
+        let output_path = output_file.path().to_path_buf();
+        save_arazzo(&output_path, &spec).unwrap();
+
+        let yaml = std::fs::read_to_string(&output_path).unwrap();
+
+        // Verify struct fields appear in definition order
+        let arazzo_pos = yaml.find("arazzo:").unwrap();
+        let info_pos = yaml.find("info:").unwrap();
+        let workflows_pos = yaml.find("workflows:").unwrap();
+
+        assert!(arazzo_pos < info_pos);
+        assert!(info_pos < workflows_pos);
+    }
 }

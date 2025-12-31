@@ -12,6 +12,7 @@ colored = "3.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 serde_json = "1.0"
+indexmap = { version = "2.12", features = ["serde"] }
 
 # OpenAPI parsing
 oas3 = "0.20"
