@@ -1,19 +1,18 @@
 use crate::{
+    HornetError, Result,
     cli::OutputFormat,
     graph::{
         builder::build_flow_graph,
         exporter::{export_dot, export_json, export_mermaid},
         validator::validate_flow_graph,
     },
-    loader, Result,
+    loader::{self, SourceDescriptionResolver},
 };
 use colored::*;
-use std::path::Path;
 use std::path::PathBuf;
 
 pub fn execute_visualize(
-    arazzo_path: &Path,
-    openapi_path: &Option<PathBuf>,
+    arazzo_path: &PathBuf,
     format: &OutputFormat,
     output_path: &Option<PathBuf>,
 ) -> Result<()> {
@@ -21,27 +20,28 @@ pub fn execute_visualize(
     println!("{}", "Loading Arazzo file...".bright_blue());
     println!("  Path: {}", arazzo_path.display());
 
-    let arazzo = loader::load_arazzo(arazzo_path.to_str().unwrap())?;
+    let arazzo = loader::load_arazzo(arazzo_path)?;
     println!("{}", "✓ Arazzo loaded successfully".green());
     println!();
 
-    // Load OpenAPI (optional)
-    let openapi = if let Some(path) = openapi_path {
-        println!("{}", "Loading OpenAPI file...".bright_blue());
-        println!("  Path: {}", path.display());
+    // Load OpenAPI sources from sourceDescriptions
+    let resolver_helper = SourceDescriptionResolver::new(arazzo_path)?;
+    let source_result = resolver_helper.load_sources(&arazzo.source_descriptions);
 
-        let spec = loader::load_openapi(path.to_str().unwrap())?;
-        println!("{}", "✓ OpenAPI loaded successfully".green());
+    // Report source loading errors (but continue)
+    if !source_result.errors.is_empty() {
+        println!("{}", "⚠️  Some OpenAPI sources failed to load:".yellow());
+        for err in &source_result.errors {
+            println!("  - Source '{}': {}", err.name, err.message);
+        }
         println!();
-        Some(spec)
-    } else {
-        None
-    };
+    }
 
     // Build graph for the first workflow
     if arazzo.workflows.is_empty() {
-        eprintln!("{}", "✗ No workflows found in Arazzo file".red().bold());
-        std::process::exit(1);
+        return Err(HornetError::ValidationError(
+            "No workflows found in Arazzo file".to_string(),
+        ));
     }
 
     let workflow = &arazzo.workflows[0];
@@ -50,7 +50,13 @@ pub fn execute_visualize(
         format!("Building flow graph for workflow: {}", workflow.workflow_id).bright_blue()
     );
 
-    let graph = build_flow_graph(workflow, openapi.as_ref())?;
+    let resolver = if source_result.resolver.get_all_specs().is_empty() {
+        None
+    } else {
+        Some(&source_result.resolver)
+    };
+
+    let graph = build_flow_graph(workflow, resolver)?;
     println!("{}", "✓ Graph built successfully".green());
     println!();
 

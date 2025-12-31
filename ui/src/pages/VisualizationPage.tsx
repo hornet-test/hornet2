@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Controls } from '../components/Controls';
 import { CytoscapeView } from '../components/CytoscapeView';
 import { DetailsPanel } from '../components/DetailsPanel';
@@ -10,6 +11,7 @@ import type {
   StatusMessage,
   WorkflowSummary,
 } from '../types/graph';
+import { useProjectStore } from '../stores/projectStore';
 
 const layoutOptions: LayoutOption[] = [
   { value: 'dagre', label: 'Hierarchical (Dagre)' },
@@ -19,36 +21,49 @@ const layoutOptions: LayoutOption[] = [
 ];
 
 export const VisualizationPage: React.FC = () => {
+  const { currentProject: project } = useProjectStore();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [workflows, setWorkflows] = useState<WorkflowSummary[]>([]);
-  const [selectedWorkflow, setSelectedWorkflow] = useState<string>('');
-  const [layout, setLayout] = useState<LayoutOption['value']>('dagre');
   const [status, setStatus] = useState<StatusMessage>({
-    message: 'Loading workflows...',
+    message: 'Loading projects...',
     type: 'info',
   });
   const [graph, setGraph] = useState<GraphData | null>(null);
   const [selectedNode, setSelectedNode] = useState<SelectedNode | null>(null);
+
+  // Read state from URL query parameters
+  const selectedWorkflow = searchParams.get('workflow') || '';
+  const layout = (searchParams.get('layout') as LayoutOption['value']) || 'dagre';
 
   const selectedWorkflowLabel = useMemo(
     () => workflows.find((wf) => wf.workflow_id === selectedWorkflow)?.workflow_id ?? '',
     [selectedWorkflow, workflows],
   );
 
+  // Removed fetchProjects and replaced with store usage is implicit by removing the definition
+
   const fetchWorkflows = useCallback(async () => {
+    if (!project) return;
     try {
       setStatus({ message: 'Loading workflows...', type: 'info' });
-      const response = await fetch('/api/workflows');
+      const response = await fetch(`/api/projects/${project}/workflows`);
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       const data = (await response.json()) as { workflows?: WorkflowSummary[] };
       const newWorkflows = data.workflows ?? [];
       setWorkflows(newWorkflows);
 
       if (newWorkflows.length) {
-        setSelectedWorkflow(newWorkflows[0].workflow_id);
+        // If no workflow is selected in URL, select the first one
+        const currentWorkflow = searchParams.get('workflow');
+        if (!currentWorkflow || !newWorkflows.find((w) => w.workflow_id === currentWorkflow)) {
+          setSearchParams((params) => {
+            params.set('workflow', newWorkflows[0].workflow_id);
+            return params;
+          });
+        }
       } else {
-        setSelectedWorkflow('');
         setGraph(null);
-        setStatus({ message: 'No workflows found. Please load an Arazzo file.', type: 'error' });
+        setStatus({ message: `No workflows found for project ${project}`, type: 'error' });
         return;
       }
 
@@ -56,42 +71,57 @@ export const VisualizationPage: React.FC = () => {
     } catch (error) {
       setStatus({ message: `Error: ${(error as Error).message}`, type: 'error' });
     }
-  }, []);
+  }, [project, searchParams, setSearchParams]);
 
-  const fetchGraph = useCallback(async (workflowId: string) => {
-    if (!workflowId) return;
-    try {
-      setStatus({ message: `Loading graph for ${workflowId}...`, type: 'info' });
-      const response = await fetch(`/api/graph/${encodeURIComponent(workflowId)}`);
-      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      const data = (await response.json()) as GraphData;
-      setGraph(data);
-      setStatus({
-        message: `Rendered ${data.nodes.length} nodes and ${data.edges.length} edges`,
-        type: 'success',
-      });
-    } catch (error) {
-      setStatus({ message: `Error: ${(error as Error).message}`, type: 'error' });
+  const fetchGraph = useCallback(
+    async (workflowId: string) => {
+      if (!workflowId || !project) return;
+      try {
+        setStatus({ message: `Loading graph for ${workflowId}...`, type: 'info' });
+        const response = await fetch(
+          `/api/projects/${project}/graph/${encodeURIComponent(workflowId)}`,
+        );
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const data = (await response.json()) as GraphData;
+        setGraph(data);
+        setStatus({
+          message: `Rendered ${data.nodes.length} nodes and ${data.edges.length} edges`,
+          type: 'success',
+        });
+      } catch (error) {
+        setStatus({ message: `Error: ${(error as Error).message}`, type: 'error' });
+      }
+    },
+    [project],
+  );
+
+  // Removed fetchProjects effect
+
+  useEffect(() => {
+    if (project) {
+      void fetchWorkflows();
     }
-  }, []);
+  }, [project, fetchWorkflows]);
 
   useEffect(() => {
-    void fetchWorkflows();
-  }, [fetchWorkflows]);
-
-  useEffect(() => {
-    if (selectedWorkflow) {
+    if (selectedWorkflow && project) {
       void fetchGraph(selectedWorkflow);
     }
-  }, [fetchGraph, selectedWorkflow]);
+  }, [fetchGraph, selectedWorkflow, project]);
 
   const handleWorkflowChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedWorkflow(event.target.value);
+    setSearchParams((params) => {
+      params.set('workflow', event.target.value);
+      return params;
+    });
     setSelectedNode(null);
   };
 
   const handleLayoutChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    setLayout(event.target.value as LayoutOption['value']);
+    setSearchParams((params) => {
+      params.set('layout', event.target.value);
+      return params;
+    });
   };
 
   const handleRefresh = () => {

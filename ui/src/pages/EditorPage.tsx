@@ -1,14 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { OperationList } from '../components/OperationList';
 import { WorkflowView } from '../components/WorkflowView';
 import { YamlEditor } from '../components/YamlEditor';
 import { DataSourcePanel } from '../components/DataSourcePanel';
 import { SuggestionPanel } from '../components/SuggestionPanel';
+import { WorkflowSelector } from '../components/WorkflowSelector';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useEditorStore } from '../stores/editorStore';
+import { useProjectStore } from '../stores/projectStore';
 
 export const EditorPage: React.FC = () => {
+  const { currentProject } = useProjectStore();
+  const [searchParams, setSearchParams] = useSearchParams();
   const {
-    loadOperations,
     isLoading,
     error,
     operations,
@@ -24,12 +29,98 @@ export const EditorPage: React.FC = () => {
     dataFlowSuggestions,
     applySuggestion,
     dismissSuggestion,
+    loadOperations,
+    workflows,
+    currentWorkflowId,
+    isDirty,
+    isSaving,
+    saveError,
+    loadWorkflows,
+    loadWorkflow,
+    saveWorkflow,
+    createNewWorkflow,
   } = useEditorStore();
-  const [viewMode, setViewMode] = useState<'visual' | 'yaml' | 'split'>('split');
+  const [showUnsavedWarning, setShowUnsavedWarning] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'load' | 'new' | null>(null);
+  const [pendingWorkflowId, setPendingWorkflowId] = useState<string | null>(null);
+
+  // Read view mode from URL query parameters
+  const viewMode = (searchParams.get('mode') as 'visual' | 'yaml' | 'split') || 'split';
 
   useEffect(() => {
-    void loadOperations();
-  }, [loadOperations]);
+    if (currentProject) {
+      void loadOperations(currentProject);
+      void loadWorkflows(currentProject);
+    }
+  }, [loadOperations, loadWorkflows, currentProject]);
+
+  // Sync workflow from URL to store
+  useEffect(() => {
+    const urlWorkflowId = searchParams.get('workflow');
+    if (urlWorkflowId && urlWorkflowId !== currentWorkflowId && currentProject) {
+      void loadWorkflow(currentProject, urlWorkflowId);
+    }
+  }, [searchParams, currentWorkflowId, currentProject, loadWorkflow]);
+
+  // Handle workflow selection
+  const handleWorkflowSelect = useCallback(
+    (workflowId: string) => {
+      if (isDirty) {
+        setPendingAction('load');
+        setPendingWorkflowId(workflowId);
+        setShowUnsavedWarning(true);
+      } else {
+        setSearchParams((params) => {
+          params.set('workflow', workflowId);
+          return params;
+        });
+      }
+    },
+    [isDirty, setSearchParams],
+  );
+
+  // Handle new workflow
+  const handleNewWorkflow = useCallback(() => {
+    if (isDirty) {
+      setPendingAction('new');
+      setShowUnsavedWarning(true);
+    } else {
+      createNewWorkflow();
+    }
+  }, [isDirty, createNewWorkflow]);
+
+  // Handle save workflow
+  const handleSaveWorkflow = useCallback(() => {
+    if (currentProject) {
+      void saveWorkflow(currentProject);
+    }
+  }, [currentProject, saveWorkflow]);
+
+  // Handle confirm unsaved action
+  const handleConfirmUnsavedAction = useCallback(() => {
+    if (pendingAction === 'load' && pendingWorkflowId) {
+      setSearchParams((params) => {
+        params.set('workflow', pendingWorkflowId);
+        return params;
+      });
+    } else if (pendingAction === 'new') {
+      createNewWorkflow();
+    }
+    setShowUnsavedWarning(false);
+    setPendingAction(null);
+    setPendingWorkflowId(null);
+  }, [pendingAction, pendingWorkflowId, setSearchParams, createNewWorkflow]);
+
+  // Handle view mode change
+  const handleViewModeChange = useCallback(
+    (mode: 'visual' | 'yaml' | 'split') => {
+      setSearchParams((params) => {
+        params.set('mode', mode);
+        return params;
+      });
+    },
+    [setSearchParams],
+  );
 
   if (isLoading) {
     return (
@@ -76,24 +167,37 @@ export const EditorPage: React.FC = () => {
   return (
     <div className="editor-page">
       <div className="editor-toolbar">
-        <h2>Arazzo Workflow Editor</h2>
+        <div className="toolbar-left">
+          <h2>Arazzo Workflow Editor</h2>
+          {currentProject && (
+            <WorkflowSelector
+              workflows={workflows}
+              currentWorkflowId={currentWorkflowId}
+              isDirty={isDirty}
+              isSaving={isSaving}
+              onWorkflowSelect={handleWorkflowSelect}
+              onNewWorkflow={handleNewWorkflow}
+              onSaveWorkflow={handleSaveWorkflow}
+            />
+          )}
+        </div>
         <div className="toolbar-controls">
           <div className="view-mode-toggle">
             <button
               className={viewMode === 'visual' ? 'active' : ''}
-              onClick={() => setViewMode('visual')}
+              onClick={() => handleViewModeChange('visual')}
             >
               Visual
             </button>
             <button
               className={viewMode === 'split' ? 'active' : ''}
-              onClick={() => setViewMode('split')}
+              onClick={() => handleViewModeChange('split')}
             >
               Split
             </button>
             <button
               className={viewMode === 'yaml' ? 'active' : ''}
-              onClick={() => setViewMode('yaml')}
+              onClick={() => handleViewModeChange('yaml')}
             >
               YAML
             </button>
@@ -116,7 +220,7 @@ export const EditorPage: React.FC = () => {
               <span className="badge">{dataFlowSuggestions.length}</span>
             )}
           </button>
-         </div>
+        </div>
       </div>
 
       <div className="editor-layout">
@@ -171,6 +275,31 @@ export const EditorPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {saveError && (
+        <div className="save-error-banner">
+          <span>⚠️ {saveError}</span>
+          <button
+            className="error-close-btn"
+            onClick={() => useEditorStore.setState({ saveError: null })}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {showUnsavedWarning && (
+        <ConfirmDialog
+          isOpen={showUnsavedWarning}
+          title="未保存の変更"
+          message="保存されていない変更があります。破棄しますか？"
+          confirmLabel="破棄"
+          cancelLabel="キャンセル"
+          variant="warning"
+          onConfirm={handleConfirmUnsavedAction}
+          onCancel={() => setShowUnsavedWarning(false)}
+        />
+      )}
 
       <style>{getStyles()}</style>
     </div>
@@ -239,10 +368,46 @@ function getStyles() {
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     }
 
+    .toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: 0;
+    }
+
     .editor-toolbar h2 {
       margin: 0;
       font-size: 1.5rem;
       color: #212529;
+    }
+
+    .save-error-banner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 1.5rem;
+      background: #f8d7da;
+      color: #842029;
+      border-bottom: 1px solid #f5c2c7;
+      font-size: 0.875rem;
+    }
+
+    .error-close-btn {
+      background: none;
+      border: none;
+      color: #842029;
+      font-size: 1.25rem;
+      cursor: pointer;
+      padding: 0;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+    }
+
+    .error-close-btn:hover {
+      background: rgba(132, 32, 41, 0.1);
     }
 
     .toolbar-controls {

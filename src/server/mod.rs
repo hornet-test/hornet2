@@ -1,57 +1,124 @@
 pub mod api;
+pub mod lsp;
+pub mod state;
 
-use axum::{
-    http::StatusCode,
-    routing::{get, post},
-    Router,
-};
+use axum::{Router, http::StatusCode, routing::get};
 use std::net::SocketAddr;
+use std::path::PathBuf;
+use tower_http::LatencyUnit;
 use tower_http::cors::CorsLayer;
-use tracing_subscriber;
+use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 
-/// Start the web server
-pub async fn start_server(
-    addr: SocketAddr,
-    arazzo_path: String,
-    openapi_path: Option<String>,
-) -> crate::Result<()> {
-    // Initialize tracing
-    tracing_subscriber::fmt::init();
+use state::AppState;
 
-    // Create shared state
-    let state = api::AppState {
-        arazzo_path,
-        openapi_path,
-    };
+/// Webサーバーを起動する（マルチプロジェクトモード）
+pub async fn start_server(addr: SocketAddr, root_dir: PathBuf) -> crate::Result<()> {
+    // .envファイルを読み込む（エラーは無視）
+    dotenv::dotenv().ok();
 
-    // Build the router
+    // トレーシングとOpenTelemetryを初期化
+    let _telemetry_guard = crate::telemetry::init_telemetry()?;
+
+    // 共有状態を作成
+    let state = AppState::new(root_dir)?;
+
+    // ルーターを構築
     let app = Router::new()
-        // Visualization API routes
-        .route("/api/workflows", get(api::get_workflows))
-        .route("/api/graph/{workflow_id}", get(api::get_graph))
-        // Editor API routes
-        .route("/api/editor/operations", get(api::get_operations))
-        .route("/api/editor/validate", post(api::validate_arazzo))
+        // Multi-Project API
+        .route("/api/projects", get(api::list_projects))
+        .route("/api/projects/{project_name}", get(api::get_project))
+        .route(
+            "/api/projects/{project_name}/arazzo",
+            get(api::get_project_arazzo).put(api::update_project_arazzo),
+        )
+        .route(
+            "/api/projects/{project_name}/workflows",
+            get(api::get_project_workflows).post(api::create_project_workflow),
+        )
+        .route(
+            "/api/projects/{project_name}/workflows/{workflow_id}",
+            get(api::get_project_workflow)
+                .put(api::update_project_workflow)
+                .delete(api::delete_project_workflow),
+        )
+        .route(
+            "/api/projects/{project_name}/graph/{workflow_id}",
+            get(api::get_project_graph),
+        )
+        // Editor API
+        .route(
+            "/api/projects/{project_name}/operations",
+            get(api::get_project_operations),
+        )
+        .route("/api/validate", axum::routing::post(api::validate_arazzo))
+        .route("/api/openapi.json", get(api::get_openapi_spec))
+        .route("/api/arazzo.json", get(api::get_arazzo_spec))
+        // LSP
+        .route("/lsp", get(lsp::lsp_handler))
         // Static files (CSS, JS) - from dist folder
         .route("/assets/{*path}", get(serve_static))
-        // Root route serves index.html
+        // ルートルートはindex.htmlを提供
         .route("/", get(serve_index))
-        // Fallback for SPA routing - serve index.html for all other routes
+        // SPAルーティングのフォールバック - 他のすべてのルートに対してindex.htmlを提供
         .fallback(serve_index)
         .with_state(state)
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(
+                    DefaultMakeSpan::new()
+                        .level(tracing::Level::INFO)
+                        .include_headers(false),
+                )
+                .on_response(
+                    DefaultOnResponse::new()
+                        .level(tracing::Level::INFO)
+                        .latency_unit(LatencyUnit::Millis),
+                ),
+        )
         .layer(CorsLayer::permissive());
 
     tracing::info!("Starting server on http://{}", addr);
     tracing::info!("Open http://{} in your browser", addr);
 
-    // Start the server
+    // サーバーを起動（graceful shutdown付き）
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
 
     Ok(())
 }
 
-/// Serve static files (CSS, JS, etc.) from ui/dist/assets/
+/// Graceful shutdownのためのシグナルハンドラ
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {
+            tracing::info!("Received Ctrl+C, initiating graceful shutdown");
+        },
+        _ = terminate => {
+            tracing::info!("Received terminate signal, initiating graceful shutdown");
+        },
+    }
+}
+
+/// ui/dist/assets/ から静的ファイル (CSS, JS, etc.) を提供する
 async fn serve_static(
     axum::extract::Path(path): axum::extract::Path<String>,
 ) -> Result<axum::response::Response, StatusCode> {
@@ -70,12 +137,12 @@ async fn serve_static(
     }
 }
 
-/// Serve index.html from ui/dist/ (production build)
+/// ui/dist/ (本番ビルド) から index.html を提供する
 async fn serve_index() -> Result<axum::response::Html<String>, StatusCode> {
     match tokio::fs::read_to_string("ui/dist/index.html").await {
         Ok(content) => Ok(axum::response::Html(content)),
         Err(_) => {
-            // If dist/index.html doesn't exist, show a helpful message
+            // dist/index.html が存在しない場合、役立つメッセージを表示
             let dev_message = r#"
 <!DOCTYPE html>
 <html>
@@ -145,9 +212,20 @@ cargo run -- serve --arazzo tests/fixtures/arazzo.yaml --openapi tests/fixtures/
     <div class="info">
         <h2>📡 API Endpoints</h2>
         <p>The following API endpoints are available:</p>
+        <h3>Multi-Project API</h3>
         <ul>
-            <li><code>GET /api/workflows</code> - List all workflows</li>
-            <li><code>GET /api/graph/{workflow_id}</code> - Get workflow graph</li>
+            <li><code>GET /api/projects</code> - List all projects</li>
+            <li><code>GET /api/projects/{project_name}</code> - Get project details</li>
+            <li><code>GET /api/projects/{project_name}/arazzo</code> - Get Arazzo specification</li>
+            <li><code>PUT /api/projects/{project_name}/arazzo</code> - Update Arazzo specification</li>
+            <li><code>GET /api/projects/{project_name}/workflows</code> - List all workflows</li>
+            <li><code>POST /api/projects/{project_name}/workflows</code> - Create new workflow</li>
+            <li><code>GET /api/projects/{project_name}/workflows/{id}</code> - Get specific workflow</li>
+            <li><code>PUT /api/projects/{project_name}/workflows/{id}</code> - Update specific workflow</li>
+            <li><code>DELETE /api/projects/{project_name}/workflows/{id}</code> - Delete specific workflow</li>
+            <li><code>GET /api/projects/{project_name}/graph/{id}</code> - Get workflow graph visualization</li>
+            <li><code>GET /api/openapi.json</code> - Get API specification (OpenAPI 3.0.3)</li>
+            <li><code>GET /api/arazzo.json</code> - Get Arazzo workflow specification (Arazzo 1.0.0)</li>
         </ul>
     </div>
 </body>

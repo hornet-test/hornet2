@@ -1,4 +1,4 @@
-use crate::{loader, Result};
+use crate::{Result, loader};
 use colored::*;
 use std::path::Path;
 

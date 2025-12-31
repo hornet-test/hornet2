@@ -1,7 +1,7 @@
 [package]
 name = "hornet2"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 # CLI
@@ -12,6 +12,7 @@ colored = "3.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 serde_json = "1.0"
+indexmap = { version = "2.12", features = ["serde"] }
 
 # OpenAPI parsing
 oas3 = "0.20"
@@ -25,14 +26,32 @@ petgraph = "0.8"
 regex = "1.12"
 
 # Web server
-axum = "0.8"
+axum = { version = "0.8", features = ["ws"] }
+futures = "0.3"
 tokio = { version = "1.48", features = ["full"] }
 tower-http = { version = "0.6", features = ["fs", "trace", "cors"] }
+tokio-util = { version = "0.7", features = ["io", "codec", "compat"] }
 tracing = "0.1"
-tracing-subscriber = "0.3"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 mime_guess = "2.0"
+
+# OpenTelemetry
+opentelemetry = { version = "0.31.0", features = ["trace", "metrics", "logs"] }
+opentelemetry_sdk = { version = "0.31.0", features = ["rt-tokio", "trace", "metrics", "logs"] }
+opentelemetry-otlp = { version = "0.31.0", features = ["http-proto", "reqwest-client", "trace", "metrics", "logs"] }
+tracing-opentelemetry = "0.32"
+opentelemetry-http = "0.31.0"
+http = "1.0"
+dotenv = "0.15"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+
+# LSP
+tower-lsp = "0.20"
+lsp-types = "0.97"
+dashmap = "6.1"
 
 # Utility
 tempfile = "3.24"
 
 [dev-dependencies]
+tower = { version = "0.5.2", features = ["util"] }

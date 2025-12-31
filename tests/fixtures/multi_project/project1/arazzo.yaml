@@ -1,0 +1,20 @@
+arazzo: 1.0.0
+info:
+  title: Project 1 API Testing
+  version: 1.0.0
+  description: Test workflows for project 1
+sourceDescriptions:
+  - name: petstore
+    url: openapi.yaml
+    type: openapi
+workflows:
+  - workflowId: get-pet-workflow
+    summary: Get a pet by ID
+    description: Retrieve pet information
+    steps:
+      - stepId: get-pet
+        operationId: getPetById
+        parameters:
+          - name: petId
+            in: path
+            value: 1

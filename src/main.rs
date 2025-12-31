@@ -1,7 +1,8 @@
 use clap::Parser;
 use hornet2::{
-    cli::{Cli, Commands},
-    commands, Result,
+    Result,
+    cli::{Cli, Commands, ExportFormat},
+    commands,
 };
 
 #[tokio::main]
@@ -12,27 +13,25 @@ async fn main() -> Result<()> {
         Commands::List { arazzo } => {
             commands::execute_list(&arazzo)?;
         }
-        Commands::Validate { openapi, arazzo } => {
-            commands::execute_validate(&openapi, &arazzo)?;
+        Commands::Validate { arazzo } => {
+            commands::execute_validate(&arazzo)?;
         }
         Commands::Visualize {
             arazzo,
-            openapi,
             format,
             output,
         } => {
-            commands::execute_visualize(&arazzo, &openapi, &format, &output)?;
+            commands::execute_visualize(&arazzo, &format, &output)?;
         }
         Commands::Serve {
-            arazzo,
-            openapi,
+            root_dir,
             port,
+            lsp,
         } => {
-            commands::execute_serve(&arazzo, &openapi, port).await?;
+            commands::execute_serve(&root_dir, port, lsp).await?;
         }
         Commands::Convert {
             arazzo,
-            openapi,
             to,
             output,
             workflow,
@@ -43,7 +42,6 @@ async fn main() -> Result<()> {
         } => {
             commands::execute_convert(commands::ConvertCommandArgs {
                 arazzo_path: &arazzo,
-                openapi_path: &openapi,
                 output_path: output.as_deref(),
                 target: &to,
                 workflow_id: workflow.as_deref(),
@@ -55,7 +53,6 @@ async fn main() -> Result<()> {
         }
         Commands::Run {
             arazzo,
-            openapi,
             engine,
             workflow,
             base_url,
@@ -65,7 +62,6 @@ async fn main() -> Result<()> {
         } => {
             commands::execute_run(commands::RunCommandArgs {
                 arazzo_path: &arazzo,
-                openapi_path: &openapi,
                 engine: &engine,
                 workflow_id: workflow.as_deref(),
                 base_url: base_url.as_deref(),
@@ -73,6 +69,24 @@ async fn main() -> Result<()> {
                 duration: duration.as_deref(),
                 iterations,
             })?;
+        }
+        Commands::ExportOpenapi { format, output } => {
+            commands::execute_export_openapi(
+                match format {
+                    ExportFormat::Yaml => "yaml",
+                    ExportFormat::Json => "json",
+                },
+                output.as_deref(),
+            )?;
+        }
+        Commands::ExportArazzo { format, output } => {
+            commands::execute_export_arazzo(
+                match format {
+                    ExportFormat::Yaml => "yaml",
+                    ExportFormat::Json => "json",
+                },
+                output.as_deref(),
+            )?;
         }
     }
 

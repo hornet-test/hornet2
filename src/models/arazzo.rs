@@ -1,5 +1,5 @@
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Arazzo Specification root object
 /// https://spec.openapis.org/arazzo/latest.html
@@ -88,7 +88,7 @@ pub struct Workflow {
 
     /// Additional data for extensions (x-* fields)
     #[serde(flatten)]
-    pub extensions: HashMap<String, serde_json::Value>,
+    pub extensions: IndexMap<String, serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -213,7 +213,7 @@ pub struct SuccessAction {
 
     /// Additional criteria or configuration
     #[serde(flatten)]
-    pub config: HashMap<String, serde_json::Value>,
+    pub config: IndexMap<String, serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -227,14 +227,14 @@ pub struct FailureAction {
 
     /// Additional criteria or configuration
     #[serde(flatten)]
-    pub config: HashMap<String, serde_json::Value>,
+    pub config: IndexMap<String, serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Components {
     /// Reusable parameters
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub parameters: Option<HashMap<String, Parameter>>,
+    pub parameters: Option<IndexMap<String, Parameter>>,
 
     /// Reusable success criteria
     #[serde(
@@ -242,7 +242,7 @@ pub struct Components {
         skip_serializing_if = "Option::is_none",
         rename = "successActions"
     )]
-    pub success_actions: Option<HashMap<String, SuccessAction>>,
+    pub success_actions: Option<IndexMap<String, SuccessAction>>,
 
     /// Reusable failure actions
     #[serde(
@@ -250,11 +250,11 @@ pub struct Components {
         skip_serializing_if = "Option::is_none",
         rename = "failureActions"
     )]
-    pub failure_actions: Option<HashMap<String, FailureAction>>,
+    pub failure_actions: Option<IndexMap<String, FailureAction>>,
 
     /// Additional components
     #[serde(flatten)]
-    pub extensions: HashMap<String, serde_json::Value>,
+    pub extensions: IndexMap<String, serde_json::Value>,
 }
 
 impl ArazzoSpec {

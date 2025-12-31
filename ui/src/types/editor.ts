@@ -43,6 +43,22 @@ export interface ValidationResponse {
   errors: ValidationError[];
 }
 
+export interface ProjectInfo {
+  name: string;
+  title: string;
+  description?: string;
+  workflow_count: number;
+  arazzo_path: string;
+  openapi_files: string[];
+}
+
+export interface WorkflowInfo {
+  workflow_id: string;
+  title?: string;
+  description?: string;
+  steps: number;
+}
+
 // Arazzo Spec types (simplified for editor)
 export interface ArazzoWorkflow {
   workflowId: string;

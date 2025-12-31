@@ -3,10 +3,10 @@
 //! This module generates k6 JavaScript test scripts from Arazzo workflows.
 
 use crate::error::{HornetError, Result};
+use crate::loader::OpenApiResolver;
 use crate::models::arazzo::{ArazzoSpec, RequestBody, Step, SuccessCriteria, Workflow};
 
 use super::{ConvertOptions, Converter};
-use oas3::OpenApiV3Spec;
 use regex::Regex;
 use std::collections::HashMap;
 
@@ -20,41 +20,22 @@ impl K6Converter {
         Self
     }
 
-    /// Get the base URL from OpenAPI spec
-    fn get_base_url(openapi: &OpenApiV3Spec) -> String {
-        openapi
-            .servers
-            .first()
+    /// Get the base URL from first OpenAPI spec in resolver
+    fn get_base_url(resolver: &OpenApiResolver) -> String {
+        resolver
+            .get_all_specs()
+            .values()
+            .next()
+            .and_then(|spec| spec.servers.first())
             .map(|server| server.url.clone())
             .unwrap_or_else(|| "http://localhost:8080".to_string())
     }
 
-    /// Find operation info (path and method) by operationId
-    fn find_operation(openapi: &OpenApiV3Spec, operation_id: &str) -> Option<(String, String)> {
-        if let Some(paths) = &openapi.paths {
-            for (path, path_item) in paths.iter() {
-                let operations = [
-                    ("GET", &path_item.get),
-                    ("POST", &path_item.post),
-                    ("PUT", &path_item.put),
-                    ("DELETE", &path_item.delete),
-                    ("PATCH", &path_item.patch),
-                    ("HEAD", &path_item.head),
-                    ("OPTIONS", &path_item.options),
-                ];
-
-                for (method, op_opt) in operations.iter() {
-                    if let Some(op) = op_opt {
-                        if let Some(ref op_id) = op.operation_id {
-                            if op_id == operation_id {
-                                return Some((path.clone(), method.to_string()));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        None
+    /// Find operation info (path and method) by operationId using resolver
+    fn find_operation(resolver: &OpenApiResolver, operation_id: &str) -> Option<(String, String)> {
+        resolver
+            .find_operation(operation_id)
+            .map(|op_ref| (op_ref.path, op_ref.method))
     }
 
     /// Convert a JSON value to JavaScript code
@@ -196,7 +177,7 @@ impl K6Converter {
     fn generate_step(
         &self,
         step: &Step,
-        openapi: &OpenApiV3Spec,
+        resolver: &OpenApiResolver,
         base_url: &str,
     ) -> Result<String> {
         let mut lines = Vec::new();
@@ -205,7 +186,7 @@ impl K6Converter {
         lines.push(self.generate_step_comment(step));
 
         // Get operation info
-        let (path, method) = self.get_operation_info(step, openapi)?;
+        let (path, method) = self.get_operation_info(step, resolver)?;
 
         // Build URL
         let final_url = self.build_url(base_url, &path, &step.parameters);
@@ -260,9 +241,13 @@ impl K6Converter {
         }
     }
 
-    fn get_operation_info(&self, step: &Step, openapi: &OpenApiV3Spec) -> Result<(String, String)> {
+    fn get_operation_info(
+        &self,
+        step: &Step,
+        resolver: &OpenApiResolver,
+    ) -> Result<(String, String)> {
         if let Some(ref op_id) = step.operation_id {
-            Self::find_operation(openapi, op_id).ok_or_else(|| {
+            Self::find_operation(resolver, op_id).ok_or_else(|| {
                 HornetError::OperationNotFound(format!("Operation '{}' not found", op_id))
             })
         } else if let Some(ref op_path) = step.operation_path {
@@ -446,7 +431,8 @@ impl K6Converter {
         for (i, crit) in criteria.iter().enumerate() {
             let check_name = format!("check_{}", i + 1);
 
-            let (left, right) = self.convert_criteria_to_check(crit, response_var);
+            // Use 'r' instead of response_var in check callbacks
+            let (left, right) = self.convert_criteria_to_check(crit, "r");
 
             let operator = match crit.condition.as_str() {
                 "==" | "$eq" => "===",
@@ -458,10 +444,18 @@ impl K6Converter {
                 _ => "===",
             };
 
-            checks.push(format!(
-                "    '{}': (r) => {} {} {}",
-                check_name, left, operator, right
-            ));
+            // Wrap JSON access in a try-catch or conditional
+            let check_expr = if left.contains(".json()") {
+                // For JSON access, add safety check
+                format!(
+                    "r.status >= 200 && r.status < 300 && {} {} {}",
+                    left, operator, right
+                )
+            } else {
+                format!("{} {} {}", left, operator, right)
+            };
+
+            checks.push(format!("    '{}': (r) => {}", check_name, check_expr));
         }
 
         if checks.is_empty() {
@@ -501,7 +495,8 @@ impl K6Converter {
             format!("{}.status", response_var)
         } else if context.starts_with("$response.body.") {
             let field = context.strip_prefix("$response.body.").unwrap();
-            format!("{}.json('{}')", response_var, field)
+            // Use .json().field syntax for k6
+            format!("{}.json().{}", response_var, field)
         } else if context.starts_with("$response.header.") {
             let header = context.strip_prefix("$response.header.").unwrap();
             format!("{}.headers['{}']", response_var, header)
@@ -524,14 +519,8 @@ impl K6Converter {
 
         let extraction = if expr.starts_with("$response.body.") {
             let field = expr.strip_prefix("$response.body.").unwrap();
-            // Handle nested fields
-            let parts: Vec<&str> = field.split('.').collect();
-            if parts.len() == 1 {
-                format!("{}.json('{}')", response_var, field)
-            } else {
-                // For nested access, use json() then property access
-                format!("{}.json().{}", response_var, field)
-            }
+            // Always use .json().field syntax for k6
+            format!("{}.json().{}", response_var, field)
         } else if expr == "$response.body" {
             format!("{}.json()", response_var)
         } else if expr.starts_with("$response.header.") {
@@ -541,7 +530,424 @@ impl K6Converter {
             Self::convert_runtime_expr(expr)
         };
 
-        format!("  let {} = {};", var_name, extraction)
+        // Wrap in a conditional to avoid parsing errors on failed responses
+        format!(
+            "  let {} = {}.status >= 200 && {}.status < 300 ? {} : undefined;",
+            var_name, response_var, response_var, extraction
+        )
+    }
+
+    /// Generate workflow with conditional branching support
+    fn generate_workflow_with_branching(
+        &self,
+        workflow: &Workflow,
+        resolver: &OpenApiResolver,
+        base_url: &str,
+    ) -> Result<String> {
+        let mut lines = Vec::new();
+
+        // Create step map for easy lookup
+        let step_map: HashMap<String, &Step> = workflow
+            .steps
+            .iter()
+            .map(|s| (s.step_id.clone(), s))
+            .collect();
+
+        // Generate each step as a separate function (with inputs parameter)
+        for step in &workflow.steps {
+            let func_name = format!("step_{}", step.step_id);
+            lines.push(format!("function {}(inputs) {{", func_name));
+
+            // Generate step code
+            let step_code = self.generate_step(step, resolver, base_url)?;
+            lines.push(step_code);
+
+            // Return response variable for conditional logic
+            let response_var = format!("{}_response", step.step_id);
+            lines.push(format!("  return {};", response_var));
+            lines.push("}".to_string());
+            lines.push(String::new());
+        }
+
+        // Generate main function with control flow
+        lines.push("export default function () {".to_string());
+
+        // Add inputs
+        let inputs = Self::generate_inputs(workflow);
+        lines.push(inputs);
+
+        // Generate control flow starting from first step
+        if !workflow.steps.is_empty() {
+            let control_flow = self.generate_control_flow(&workflow.steps, &step_map, 0, "  ")?;
+            lines.push(control_flow);
+        }
+
+        lines.push("  sleep(1);".to_string());
+        lines.push("}".to_string());
+
+        Ok(lines.join("\n"))
+    }
+
+    /// Generate control flow for steps with branching
+    fn generate_control_flow(
+        &self,
+        steps: &[Step],
+        step_map: &HashMap<String, &Step>,
+        start_idx: usize,
+        indent: &str,
+    ) -> Result<String> {
+        let mut lines = Vec::new();
+        let mut visited = std::collections::HashSet::new();
+        let mut current_idx = start_idx;
+
+        while current_idx < steps.len() {
+            let step = &steps[current_idx];
+
+            // Prevent infinite loops
+            if visited.contains(&step.step_id) {
+                break;
+            }
+            visited.insert(step.step_id.clone());
+
+            let response_var = format!("{}_response", step.step_id);
+            lines.push(format!(
+                "{}let {} = step_{}(inputs);",
+                indent, response_var, step.step_id
+            ));
+
+            // Check for branching
+            if step.on_success.is_some() || step.on_failure.is_some() {
+                // Determine success condition
+                let success_check = if let Some(ref criteria) = step.success_criteria {
+                    self.generate_success_condition(criteria, &response_var)
+                } else {
+                    // Default: check status code 2xx
+                    format!(
+                        "{}.status >= 200 && {}.status < 300",
+                        response_var, response_var
+                    )
+                };
+
+                lines.push(format!("{}if ({}) {{", indent, success_check));
+
+                // Handle onSuccess actions
+                if let Some(ref actions) = step.on_success {
+                    for action in actions {
+                        if action.action_type == "goto" {
+                            if let Some(step_id) = action.config.get("stepId")
+                                && let Some(step_id_str) = step_id.as_str()
+                            {
+                                lines.push(format!(
+                                    "{}  // onSuccess: goto {}",
+                                    indent, step_id_str
+                                ));
+                                // Find target step and generate its execution
+                                if let Some(target_step) = step_map.get(step_id_str) {
+                                    let target_response_var =
+                                        format!("{}_response", target_step.step_id);
+                                    lines.push(format!(
+                                        "{}  let {} = step_{}(inputs);",
+                                        indent, target_response_var, target_step.step_id
+                                    ));
+                                }
+                            }
+                        } else if action.action_type == "end" {
+                            lines.push(format!("{}  return; // onSuccess: end", indent));
+                        }
+                    }
+                } else {
+                    // No onSuccess action, continue to next step
+                    lines.push(format!("{}  // Continue to next step", indent));
+                }
+
+                lines.push(format!("{}}} else {{", indent));
+
+                // Handle onFailure actions
+                if let Some(ref actions) = step.on_failure {
+                    for action in actions {
+                        // Check if action has specific criteria
+                        if let Some(criteria_val) = action.config.get("criteria")
+                            && let Some(criteria_arr) = criteria_val.as_array()
+                        {
+                            // Generate condition for criteria
+                            let mut conditions = Vec::new();
+                            for crit_val in criteria_arr {
+                                if let Some(context) =
+                                    crit_val.get("context").and_then(|v| v.as_str())
+                                    && let Some(condition) =
+                                        crit_val.get("condition").and_then(|v| v.as_str())
+                                    && let Some(value) = crit_val.get("value")
+                                {
+                                    let left = self.convert_context_to_js(context, &response_var);
+                                    let operator = match condition {
+                                        "==" | "$eq" => "===",
+                                        "!=" | "$ne" => "!==",
+                                        ">" | "$gt" => ">",
+                                        ">=" | "$gte" => ">=",
+                                        "<" | "$lt" => "<",
+                                        "<=" | "$lte" => "<=",
+                                        _ => "===",
+                                    };
+                                    let right = Self::json_to_js(value, 0);
+                                    conditions.push(format!("{} {} {}", left, operator, right));
+                                }
+                            }
+
+                            if !conditions.is_empty() {
+                                lines.push(format!(
+                                    "{}  if ({}) {{",
+                                    indent,
+                                    conditions.join(" && ")
+                                ));
+                            }
+                        }
+
+                        if action.action_type == "goto" {
+                            if let Some(step_id) = action.config.get("stepId")
+                                && let Some(step_id_str) = step_id.as_str()
+                            {
+                                lines.push(format!(
+                                    "{}    // onFailure: goto {}",
+                                    indent, step_id_str
+                                ));
+                                // Find target step and generate its execution
+                                if let Some(target_step) = step_map.get(step_id_str) {
+                                    let target_response_var =
+                                        format!("{}_response", target_step.step_id);
+                                    lines.push(format!(
+                                        "{}    let {} = step_{}(inputs);",
+                                        indent, target_response_var, target_step.step_id
+                                    ));
+                                }
+                            }
+                        } else if action.action_type == "end" {
+                            lines.push(format!("{}    return; // onFailure: end", indent));
+                        }
+
+                        // Close criteria if block
+                        if action.config.contains_key("criteria") {
+                            lines.push(format!("{}  }}", indent));
+                        }
+                    }
+                } else {
+                    // No onFailure action, just log and continue
+                    lines.push(format!(
+                        "{}  console.error('Step {} failed');",
+                        indent, step.step_id
+                    ));
+                }
+
+                lines.push(format!("{}}}", indent));
+
+                // After branching, we usually don't continue sequentially
+                break;
+            }
+
+            current_idx += 1;
+        }
+
+        Ok(lines.join("\n"))
+    }
+
+    /// Generate control flow for multi-workflow mode (with function name prefix)
+    fn generate_control_flow_for_multi(
+        &self,
+        steps: &[Step],
+        step_map: &HashMap<String, &Step>,
+        func_prefix: &str,
+        indent: &str,
+    ) -> Result<String> {
+        let mut lines = Vec::new();
+        let mut visited = std::collections::HashSet::new();
+        let mut current_idx = 0;
+
+        while current_idx < steps.len() {
+            let step = &steps[current_idx];
+
+            // Prevent infinite loops
+            if visited.contains(&step.step_id) {
+                break;
+            }
+            visited.insert(step.step_id.clone());
+
+            let response_var = format!("{}_response", step.step_id);
+            let step_func = format!("{}__step_{}", func_prefix, step.step_id);
+            lines.push(format!(
+                "{}let {} = {}(inputs);",
+                indent, response_var, step_func
+            ));
+
+            // Check for branching
+            if step.on_success.is_some() || step.on_failure.is_some() {
+                // Determine success condition
+                let success_check = if let Some(ref criteria) = step.success_criteria {
+                    self.generate_success_condition(criteria, &response_var)
+                } else {
+                    // Default: check status code 2xx
+                    format!(
+                        "{}.status >= 200 && {}.status < 300",
+                        response_var, response_var
+                    )
+                };
+
+                lines.push(format!("{}if ({}) {{", indent, success_check));
+
+                // Handle onSuccess actions
+                if let Some(ref actions) = step.on_success {
+                    for action in actions {
+                        if action.action_type == "goto" {
+                            if let Some(step_id) = action.config.get("stepId")
+                                && let Some(step_id_str) = step_id.as_str()
+                            {
+                                lines.push(format!(
+                                    "{}  // onSuccess: goto {}",
+                                    indent, step_id_str
+                                ));
+                                // Find target step and generate its execution
+                                if let Some(target_step) = step_map.get(step_id_str) {
+                                    let target_response_var =
+                                        format!("{}_response", target_step.step_id);
+                                    let target_func =
+                                        format!("{}__step_{}", func_prefix, target_step.step_id);
+                                    lines.push(format!(
+                                        "{}  let {} = {}(inputs);",
+                                        indent, target_response_var, target_func
+                                    ));
+                                }
+                            }
+                        } else if action.action_type == "end" {
+                            lines.push(format!("{}  return; // onSuccess: end", indent));
+                        }
+                    }
+                } else {
+                    // No onSuccess action, continue to next step
+                    lines.push(format!("{}  // Continue to next step", indent));
+                }
+
+                lines.push(format!("{}}} else {{", indent));
+
+                // Handle onFailure actions
+                if let Some(ref actions) = step.on_failure {
+                    for action in actions {
+                        // Check if action has specific criteria
+                        if let Some(criteria_val) = action.config.get("criteria")
+                            && let Some(criteria_arr) = criteria_val.as_array()
+                        {
+                            // Generate condition for criteria
+                            let mut conditions = Vec::new();
+                            for crit_val in criteria_arr {
+                                if let Some(context) =
+                                    crit_val.get("context").and_then(|v| v.as_str())
+                                    && let Some(condition) =
+                                        crit_val.get("condition").and_then(|v| v.as_str())
+                                    && let Some(value) = crit_val.get("value")
+                                {
+                                    let left = self.convert_context_to_js(context, &response_var);
+                                    let operator = match condition {
+                                        "==" | "$eq" => "===",
+                                        "!=" | "$ne" => "!==",
+                                        ">" | "$gt" => ">",
+                                        ">=" | "$gte" => ">=",
+                                        "<" | "$lt" => "<",
+                                        "<=" | "$lte" => "<=",
+                                        _ => "===",
+                                    };
+                                    let right = Self::json_to_js(value, 0);
+                                    conditions.push(format!("{} {} {}", left, operator, right));
+                                }
+                            }
+
+                            if !conditions.is_empty() {
+                                lines.push(format!(
+                                    "{}  if ({}) {{",
+                                    indent,
+                                    conditions.join(" && ")
+                                ));
+                            }
+                        }
+
+                        if action.action_type == "goto" {
+                            if let Some(step_id) = action.config.get("stepId")
+                                && let Some(step_id_str) = step_id.as_str()
+                            {
+                                lines.push(format!(
+                                    "{}    // onFailure: goto {}",
+                                    indent, step_id_str
+                                ));
+                                // Find target step and generate its execution
+                                if let Some(target_step) = step_map.get(step_id_str) {
+                                    let target_response_var =
+                                        format!("{}_response", target_step.step_id);
+                                    let target_func =
+                                        format!("{}__step_{}", func_prefix, target_step.step_id);
+                                    lines.push(format!(
+                                        "{}    let {} = {}(inputs);",
+                                        indent, target_response_var, target_func
+                                    ));
+                                }
+                            }
+                        } else if action.action_type == "end" {
+                            lines.push(format!("{}    return; // onFailure: end", indent));
+                        }
+
+                        // Close criteria if block
+                        if action.config.contains_key("criteria") {
+                            lines.push(format!("{}  }}", indent));
+                        }
+                    }
+                } else {
+                    // No onFailure action, just log and continue
+                    lines.push(format!(
+                        "{}  console.error('Step {} failed');",
+                        indent, step.step_id
+                    ));
+                }
+
+                lines.push(format!("{}}}", indent));
+
+                // After branching, we usually don't continue sequentially
+                break;
+            }
+
+            current_idx += 1;
+        }
+
+        Ok(lines.join("\n"))
+    }
+
+    /// Generate success condition from criteria
+    fn generate_success_condition(
+        &self,
+        criteria: &[SuccessCriteria],
+        response_var: &str,
+    ) -> String {
+        let mut conditions = Vec::new();
+
+        for crit in criteria {
+            let left = self.convert_context_to_js(&crit.context, response_var);
+            let operator = match crit.condition.as_str() {
+                "==" | "$eq" => "===",
+                "!=" | "$ne" => "!==",
+                ">" | "$gt" => ">",
+                ">=" | "$gte" => ">=",
+                "<" | "$lt" => "<",
+                "<=" | "$lte" => "<=",
+                _ => "===",
+            };
+            let right = if let Some(ref val) = crit.value {
+                Self::json_to_js(val, 0)
+            } else {
+                "true".to_string()
+            };
+
+            conditions.push(format!("{} {} {}", left, operator, right));
+        }
+
+        if conditions.is_empty() {
+            "true".to_string()
+        } else {
+            conditions.join(" && ")
+        }
     }
 
     /// Generate workflow inputs
@@ -576,7 +982,7 @@ impl Converter for K6Converter {
     fn convert_spec(
         &self,
         arazzo: &ArazzoSpec,
-        openapi: &OpenApiV3Spec,
+        resolver: &OpenApiResolver,
         options: &ConvertOptions,
     ) -> Result<Self::Output> {
         if arazzo.workflows.is_empty() {
@@ -585,14 +991,14 @@ impl Converter for K6Converter {
 
         // If only one workflow, generate it directly
         if arazzo.workflows.len() == 1 {
-            return self.convert_workflow(&arazzo.workflows[0], openapi, options);
+            return self.convert_workflow(&arazzo.workflows[0], resolver, options);
         }
 
         // For multiple workflows, combine them into one script with separate functions
         let base_url = options
             .base_url
             .clone()
-            .unwrap_or_else(|| Self::get_base_url(openapi));
+            .unwrap_or_else(|| Self::get_base_url(resolver));
 
         let mut lines = Vec::new();
 
@@ -616,20 +1022,72 @@ impl Converter for K6Converter {
             if let Some(ref summary) = workflow.summary {
                 lines.push(format!("// {}", summary));
             }
-            lines.push(format!("function {}() {{", func_name));
 
-            // Add inputs
-            let inputs = Self::generate_inputs(workflow);
-            lines.push(inputs);
+            // Check if workflow has conditional branching
+            let has_branching = workflow
+                .steps
+                .iter()
+                .any(|s| s.on_success.is_some() || s.on_failure.is_some());
 
-            // Generate steps
-            for step in &workflow.steps {
-                let step_code = self.generate_step(step, openapi, &base_url)?;
-                lines.push(step_code);
+            if has_branching {
+                // Generate step functions for branching workflow
+                let step_map: HashMap<String, &Step> = workflow
+                    .steps
+                    .iter()
+                    .map(|s| (s.step_id.clone(), s))
+                    .collect();
+
+                // Generate each step as a separate function (with inputs parameter)
+                for step in &workflow.steps {
+                    let step_func_name = format!("{}__step_{}", func_name, step.step_id);
+                    lines.push(format!("function {}(inputs) {{", step_func_name));
+
+                    // Generate step code
+                    let step_code = self.generate_step(step, resolver, &base_url)?;
+                    lines.push(step_code);
+
+                    // Return response variable for conditional logic
+                    let response_var = format!("{}_response", step.step_id);
+                    lines.push(format!("  return {};", response_var));
+                    lines.push("}".to_string());
+                    lines.push(String::new());
+                }
+
+                // Generate main workflow function with control flow
+                lines.push(format!("function {}() {{", func_name));
+
+                // Add inputs
+                let inputs = Self::generate_inputs(workflow);
+                lines.push(inputs);
+
+                // Generate control flow
+                let control_flow = self.generate_control_flow_for_multi(
+                    &workflow.steps,
+                    &step_map,
+                    &func_name,
+                    "  ",
+                )?;
+                lines.push(control_flow);
+
+                lines.push("}".to_string());
+                lines.push(String::new());
+            } else {
+                // Simple sequential workflow
+                lines.push(format!("function {}() {{", func_name));
+
+                // Add inputs
+                let inputs = Self::generate_inputs(workflow);
+                lines.push(inputs);
+
+                // Generate steps
+                for step in &workflow.steps {
+                    let step_code = self.generate_step(step, resolver, &base_url)?;
+                    lines.push(step_code);
+                }
+
+                lines.push("}".to_string());
+                lines.push(String::new());
             }
-
-            lines.push("}".to_string());
-            lines.push(String::new());
         }
 
         // Add default function that calls all workflows
@@ -647,13 +1105,13 @@ impl Converter for K6Converter {
     fn convert_workflow(
         &self,
         workflow: &Workflow,
-        openapi: &OpenApiV3Spec,
+        resolver: &OpenApiResolver,
         options: &ConvertOptions,
     ) -> Result<Self::Output> {
         let base_url = options
             .base_url
             .clone()
-            .unwrap_or_else(|| Self::get_base_url(openapi));
+            .unwrap_or_else(|| Self::get_base_url(resolver));
 
         let mut lines = Vec::new();
 
@@ -675,22 +1133,33 @@ impl Converter for K6Converter {
         // Add options
         lines.push(Self::generate_options(options));
 
-        // Add default function
-        lines.push("export default function () {".to_string());
+        // Check if workflow has conditional branching
+        let has_branching = workflow
+            .steps
+            .iter()
+            .any(|s| s.on_success.is_some() || s.on_failure.is_some());
 
-        // Add inputs
-        let inputs = Self::generate_inputs(workflow);
-        lines.push(inputs);
+        if has_branching {
+            // Generate workflow with conditional branching support
+            lines.push(self.generate_workflow_with_branching(workflow, resolver, &base_url)?);
+        } else {
+            // Generate simple sequential workflow
+            lines.push("export default function () {".to_string());
 
-        // Generate steps
-        for step in &workflow.steps {
-            let step_code = self.generate_step(step, openapi, &base_url)?;
-            lines.push(step_code);
+            // Add inputs
+            let inputs = Self::generate_inputs(workflow);
+            lines.push(inputs);
+
+            // Generate steps
+            for step in &workflow.steps {
+                let step_code = self.generate_step(step, resolver, &base_url)?;
+                lines.push(step_code);
+            }
+
+            // Add sleep at end (optional, for load testing)
+            lines.push("  sleep(1);".to_string());
+            lines.push("}".to_string());
         }
-
-        // Add sleep at end (optional, for load testing)
-        lines.push("  sleep(1);".to_string());
-        lines.push("}".to_string());
 
         Ok(lines.join("\n"))
     }
@@ -699,7 +1168,7 @@ impl Converter for K6Converter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::loader::{arazzo::load_arazzo, openapi::load_openapi};
+    use crate::loader::arazzo::load_arazzo;
 
     #[test]
     fn test_convert_runtime_expr() {
@@ -775,13 +1244,21 @@ mod tests {
 
     #[test]
     fn test_convert_workflow_integration() {
+        use crate::loader::OpenApiResolver;
+        use std::path::Path;
+
         let arazzo = load_arazzo("tests/fixtures/arazzo.yaml").unwrap();
-        let openapi = load_openapi("tests/fixtures/openapi.yaml").unwrap();
+
+        // Create resolver and load OpenAPI spec
+        let mut resolver = OpenApiResolver::new(Path::new("tests/fixtures"));
+        resolver
+            .load_spec("userAPI", Path::new("tests/fixtures/openapi.yaml"))
+            .unwrap();
 
         let converter = K6Converter::new();
         let options = ConvertOptions::default();
 
-        let result = converter.convert_workflow(&arazzo.workflows[0], &openapi, &options);
+        let result = converter.convert_workflow(&arazzo.workflows[0], &resolver, &options);
         assert!(result.is_ok());
 
         let script = result.unwrap();

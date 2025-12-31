@@ -19,12 +19,8 @@ pub enum Commands {
         arazzo: PathBuf,
     },
 
-    /// Validate OpenAPI and Arazzo files
+    /// Validate Arazzo file (OpenAPI paths from sourceDescriptions)
     Validate {
-        /// Path to OpenAPI file
-        #[arg(short, long)]
-        openapi: PathBuf,
-
         /// Path to Arazzo file
         #[arg(short, long)]
         arazzo: PathBuf,
@@ -36,10 +32,6 @@ pub enum Commands {
         #[arg(short, long)]
         arazzo: PathBuf,
 
-        /// Path to OpenAPI file (optional)
-        #[arg(short, long)]
-        openapi: Option<PathBuf>,
-
         /// Output format
         #[arg(short, long, default_value = "dot")]
         format: OutputFormat,
@@ -49,19 +41,19 @@ pub enum Commands {
         output: Option<PathBuf>,
     },
 
-    /// Start web server for visualization
+    /// Start web server for visualization (multi-project mode)
     Serve {
-        /// Path to Arazzo file
+        /// Root directory containing project folders
         #[arg(short, long)]
-        arazzo: PathBuf,
-
-        /// Path to OpenAPI file (optional)
-        #[arg(short, long)]
-        openapi: Option<PathBuf>,
+        root_dir: PathBuf,
 
         /// Port number
         #[arg(short, long, default_value = "3000")]
         port: u16,
+
+        /// Start in LSP mode (Language Server Protocol)
+        #[arg(long)]
+        lsp: bool,
     },
 
     /// Convert Arazzo workflow to test script
@@ -69,10 +61,6 @@ pub enum Commands {
         /// Path to Arazzo file
         #[arg(short, long)]
         arazzo: PathBuf,
-
-        /// Path to OpenAPI file
-        #[arg(short, long)]
-        openapi: PathBuf,
 
         /// Target format (k6)
         #[arg(short, long, default_value = "k6")]
@@ -109,10 +97,6 @@ pub enum Commands {
         #[arg(short, long)]
         arazzo: PathBuf,
 
-        /// Path to OpenAPI file
-        #[arg(short, long)]
-        openapi: PathBuf,
-
         /// Test engine to use (k6)
         #[arg(short, long, default_value = "k6")]
         engine: String,
@@ -137,6 +121,28 @@ pub enum Commands {
         #[arg(long)]
         iterations: Option<u32>,
     },
+
+    /// Export Hornet2 API specification in OpenAPI format
+    ExportOpenapi {
+        /// Output format (json or yaml)
+        #[arg(short, long, default_value = "yaml")]
+        format: ExportFormat,
+
+        /// Output file (stdout if not specified)
+        #[arg(short = 'O', long)]
+        output: Option<PathBuf>,
+    },
+
+    /// Export Hornet2 Arazzo specification
+    ExportArazzo {
+        /// Output format (json or yaml)
+        #[arg(short, long, default_value = "yaml")]
+        format: ExportFormat,
+
+        /// Output file (stdout if not specified)
+        #[arg(short = 'O', long)]
+        output: Option<PathBuf>,
+    },
 }
 
 #[derive(Clone, ValueEnum)]
@@ -147,4 +153,12 @@ pub enum OutputFormat {
     Json,
     /// Mermaid diagram format
     Mermaid,
+}
+
+#[derive(Clone, ValueEnum)]
+pub enum ExportFormat {
+    /// YAML format
+    Yaml,
+    /// JSON format
+    Json,
 }

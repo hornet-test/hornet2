@@ -1,0 +1,39 @@
+arazzo: 1.0.0
+info:
+  title: Invalid Arazzo Test
+  version: 1.0.0
+
+workflows:
+  - workflowId: test-flow
+    steps:
+      # Error: operationId doesn't exist
+      - stepId: step1
+        operationId: nonExistentOperation
+
+      # Error: invalid step reference
+      - stepId: step2
+        operationId: loginUser
+        requestBody:
+          contentType: application/json
+          payload:
+            username: $steps.nonExistentStep.outputs.username
+            password: test123
+
+      # Error: step order violation (references step3 which comes after)
+      - stepId: step3
+        operationId: registerUser
+        requestBody:
+          contentType: application/json
+          payload:
+            username: test
+            email: $steps.step4.outputs.email
+            password: test123
+
+      - stepId: step4
+        operationId: registerUser
+        requestBody:
+          contentType: application/json
+          payload:
+            username: test2
+            email: test@test.com
+            password: test123

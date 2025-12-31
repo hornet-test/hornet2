@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import yaml from 'js-yaml';
-import type { ArazzoSpec, OperationInfo, ValidationError } from '../types/editor';
+import type { ArazzoSpec, OperationInfo, ValidationError, WorkflowInfo } from '../types/editor';
 import { analyzeDataFlow, type DataFlowSuggestion } from '../utils/dataFlowAnalyzer';
 
 export interface DataSource {
@@ -24,6 +24,13 @@ interface EditorState {
   dataFlowSuggestions: DataFlowSuggestion[];
   dismissedSuggestions: Set<string>;
 
+  // Workflow management
+  workflows: WorkflowInfo[];
+  currentWorkflowId: string | null;
+  isDirty: boolean;
+  isSaving: boolean;
+  saveError: string | null;
+
   // UI state
   selectedOperation: OperationInfo | null;
   selectedStepId: string | null;
@@ -33,7 +40,11 @@ interface EditorState {
   error: string | null;
 
   // Actions
-  loadOperations: () => Promise<void>;
+  loadOperations: (projectName: string) => Promise<void>;
+  loadWorkflows: (projectName: string) => Promise<void>;
+  loadWorkflow: (projectName: string, workflowId: string) => Promise<void>;
+  saveWorkflow: (projectName: string) => Promise<void>;
+  createNewWorkflow: () => void;
   setArazzoSpec: (spec: ArazzoSpec) => void;
   setYamlContent: (yaml: string) => void;
   syncYamlToSpec: () => void;
@@ -76,6 +87,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   isValid: true,
   dataFlowSuggestions: [],
   dismissedSuggestions: new Set(),
+  workflows: [],
+  currentWorkflowId: null,
+  isDirty: false,
+  isSaving: false,
+  saveError: null,
   selectedOperation: null,
   selectedStepId: null,
   dataSourcePanelOpen: false,
@@ -84,10 +100,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   error: null,
 
   // Load operations from API
-  loadOperations: async () => {
+  loadOperations: async (projectName: string) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await fetch('/api/editor/operations');
+      const response = await fetch(`/api/projects/${projectName}/operations`);
       if (!response.ok) {
         throw new Error(`Failed to load operations: ${response.statusText}`);
       }
@@ -101,9 +117,161 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
   },
 
+  // Load workflows from API
+  loadWorkflows: async (projectName: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await fetch(`/api/projects/${encodeURIComponent(projectName)}/workflows`);
+      if (!response.ok) {
+        throw new Error(`Failed to load workflows: ${response.statusText}`);
+      }
+      const data = (await response.json()) as { workflows: WorkflowInfo[] };
+      set({ workflows: data.workflows, isLoading: false });
+    } catch (error) {
+      set({
+        error: (error as Error).message,
+        isLoading: false,
+      });
+    }
+  },
+
+  // Load a specific workflow from API
+  loadWorkflow: async (projectName: string, workflowId: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await fetch(
+        `/api/projects/${encodeURIComponent(projectName)}/workflows/${encodeURIComponent(workflowId)}`,
+      );
+      if (!response.ok) {
+        throw new Error(`Failed to load workflow: ${response.statusText}`);
+      }
+      const workflow = (await response.json()) as import('../types/editor').ArazzoWorkflow;
+
+      // Convert single workflow to ArazzoSpec format
+      const spec: ArazzoSpec = {
+        arazzo: '1.0.0',
+        info: {
+          title: workflow.summary || workflowId,
+          description: workflow.description || '',
+          version: '1.0.0',
+        },
+        sourceDescriptions: [],
+        workflows: [workflow],
+      };
+
+      set({
+        arazzoSpec: spec,
+        currentWorkflowId: workflowId,
+        isDirty: false,
+        isLoading: false,
+      });
+
+      // Sync to YAML and analyze data flows
+      get().syncSpecToYaml();
+      get().analyzeDataFlows();
+    } catch (error) {
+      set({
+        error: (error as Error).message,
+        isLoading: false,
+      });
+    }
+  },
+
+  // Save current workflow
+  saveWorkflow: async (projectName: string) => {
+    const { arazzoSpec, currentWorkflowId } = get();
+    if (!arazzoSpec || arazzoSpec.workflows.length === 0) {
+      set({ saveError: 'No workflow to save' });
+      return;
+    }
+
+    const workflow = arazzoSpec.workflows[0];
+
+    // Generate workflow ID if not set
+    if (!workflow.workflowId) {
+      workflow.workflowId = `workflow-${Date.now()}`;
+    }
+
+    set({ isSaving: true, saveError: null });
+
+    try {
+      const isNewWorkflow = currentWorkflowId === null;
+      const url = isNewWorkflow
+        ? `/api/projects/${encodeURIComponent(projectName)}/workflows`
+        : `/api/projects/${encodeURIComponent(projectName)}/workflows/${encodeURIComponent(workflow.workflowId)}`;
+
+      const method = isNewWorkflow ? 'POST' : 'PUT';
+
+      // Validate workflow ID matches path for updates
+      if (!isNewWorkflow && workflow.workflowId !== currentWorkflowId) {
+        throw new Error(
+          `Workflow ID mismatch: path has "${currentWorkflowId}", body has "${workflow.workflowId}"`,
+        );
+      }
+
+      // POST expects { workflow: {...} }, PUT expects {...} directly
+      const requestBody = isNewWorkflow ? { workflow } : workflow;
+
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        // Try to parse RFC 9457 Problem Details
+        let errorMessage = `Save failed: ${response.statusText}`;
+        try {
+          const responseText = await response.text();
+          // Try to parse as JSON
+          const problem = JSON.parse(responseText) as {
+            type?: string;
+            title?: string;
+            status?: number;
+            detail?: string;
+          };
+          errorMessage = problem.detail || problem.title || errorMessage;
+        } catch {
+          // If parsing fails, use the default error message
+        }
+        throw new Error(errorMessage);
+      }
+
+      // Success
+      set({
+        currentWorkflowId: workflow.workflowId,
+        isDirty: false,
+        isSaving: false,
+        saveError: null,
+      });
+
+      // Reload workflow list
+      void get().loadWorkflows(projectName);
+    } catch (error) {
+      set({
+        saveError: (error as Error).message,
+        isSaving: false,
+      });
+    }
+  },
+
+  // Create new workflow
+  createNewWorkflow: () => {
+    set({
+      arazzoSpec: initialArazzoSpec,
+      yamlContent: yaml.dump(initialArazzoSpec),
+      currentWorkflowId: null,
+      isDirty: false,
+      selectedStepId: null,
+      selectedOperation: null,
+      dataFlowSuggestions: [],
+      dismissedSuggestions: new Set(),
+    });
+  },
+
   // Set Arazzo spec and sync to YAML
   setArazzoSpec: (spec: ArazzoSpec) => {
-    set({ arazzoSpec: spec });
+    set({ arazzoSpec: spec, isDirty: true });
     get().syncSpecToYaml();
   },
 
@@ -114,17 +282,50 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   // Sync YAML to Arazzo spec
   syncYamlToSpec: () => {
-    const { yamlContent } = get();
+    const { yamlContent, arazzoSpec } = get();
     try {
-      const parsed = yaml.load(yamlContent) as ArazzoSpec;
+      // Parse YAML as workflow fragment (not full ArazzoSpec)
+      const parsedWorkflow = yaml.load(yamlContent) as import('../types/editor').ArazzoWorkflow;
+
+      // Preserve existing spec metadata or use defaults
+      const baseSpec = arazzoSpec || {
+        arazzo: '1.0.0',
+        info: {
+          title: 'Workflow',
+          description: '',
+          version: '1.0.0',
+        },
+        sourceDescriptions: [],
+        workflows: [],
+      };
+
+      // Reconstruct full spec with updated workflow
+      const newSpec: ArazzoSpec = {
+        arazzo: baseSpec.arazzo,
+        info: {
+          ...baseSpec.info,
+          title: parsedWorkflow.summary || baseSpec.info.title,
+          description: parsedWorkflow.description || baseSpec.info.description,
+        },
+        sourceDescriptions: baseSpec.sourceDescriptions,
+        workflows: [parsedWorkflow],
+      };
+
       set({
-        arazzoSpec: parsed,
+        arazzoSpec: newSpec,
         validationErrors: [],
         isValid: true,
         error: null,
+        isDirty: true,
       });
-      // Validate with backend
-      void get().validateYaml(yamlContent);
+
+      // Validate with backend (still needs full spec)
+      const fullSpecYaml = yaml.dump(newSpec, {
+        indent: 2,
+        lineWidth: 100,
+        noRefs: true,
+      });
+      void get().validateYaml(fullSpecYaml);
     } catch (error) {
       set({
         error: `YAML parse error: ${(error as Error).message}`,
@@ -138,7 +339,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { arazzoSpec } = get();
     if (arazzoSpec) {
       try {
-        const yamlStr = yaml.dump(arazzoSpec, {
+        // Extract only workflows[0] for display
+        const workflowToEdit = arazzoSpec.workflows.length > 0
+          ? arazzoSpec.workflows[0]
+          : {
+              workflowId: 'workflow-1',
+              summary: 'New Workflow',
+              description: '',
+              steps: [],
+            };
+
+        const yamlStr = yaml.dump(workflowToEdit, {
           indent: 2,
           lineWidth: 100,
           noRefs: true,
@@ -153,7 +364,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // Validate YAML with backend
   validateYaml: async (yamlStr: string) => {
     try {
-      const response = await fetch('/api/editor/validate', {
+      const response = await fetch('/api/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ yaml: yamlStr }),

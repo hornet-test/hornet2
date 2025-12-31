@@ -1,0 +1,28 @@
+openapi: 3.0.0
+info:
+  title: Pet Store API
+  version: 1.0.0
+  description: Simple pet store API for testing
+paths:
+  /pets/{petId}:
+    get:
+      operationId: getPetById
+      summary: Get a pet by ID
+      parameters:
+        - name: petId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  name:
+                    type: string

@@ -1,0 +1,46 @@
+arazzo: 1.0.0
+info:
+  title: Invalid Dependencies Test
+  version: 1.0.0
+
+workflows:
+  - workflowId: test-flow
+    steps:
+      - stepId: step1
+        operationId: registerUser
+        requestBody:
+          contentType: application/json
+          payload:
+            username: test
+            email: test@test.com
+            password: test123
+
+      # Error: references non-existent step
+      - stepId: step2
+        operationId: loginUser
+        requestBody:
+          contentType: application/json
+          payload:
+            username: $steps.nonExistentStep.outputs.username
+            password: test123
+
+      # Error: step order violation (references step4 which comes after)
+      - stepId: step3
+        operationId: registerUser
+        requestBody:
+          contentType: application/json
+          payload:
+            username: test2
+            email: $steps.step4.outputs.email
+            password: test123
+
+      - stepId: step4
+        operationId: registerUser
+        requestBody:
+          contentType: application/json
+          payload:
+            username: test3
+            email: test3@test.com
+            password: test123
+        outputs:
+          email: $response.body.email

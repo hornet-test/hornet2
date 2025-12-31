@@ -31,6 +31,12 @@ pub enum HornetError {
 
     #[error("Operation not found: {0}")]
     OperationNotFound(String),
+
+    #[error("Project not found: {0}")]
+    ProjectNotFound(String),
+
+    #[error("Invalid path: {0}")]
+    InvalidPath(String),
 }
 
 pub type Result<T> = std::result::Result<T, HornetError>;

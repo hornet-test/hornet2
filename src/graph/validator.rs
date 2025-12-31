@@ -112,10 +112,10 @@ impl<'a> FlowGraphValidator<'a> {
             node_indices.remove(0); // Remove first node from check
 
             for node_idx in node_indices {
-                if !has_incoming.contains(&node_idx) {
-                    if let Some(node) = self.graph.graph.node_weight(node_idx) {
-                        unreachable.push(node.step_id.clone());
-                    }
+                if !has_incoming.contains(&node_idx)
+                    && let Some(node) = self.graph.graph.node_weight(node_idx)
+                {
+                    unreachable.push(node.step_id.clone());
                 }
             }
         }
@@ -129,10 +129,10 @@ impl<'a> FlowGraphValidator<'a> {
 
         for node_idx in self.graph.graph.node_indices() {
             let outgoing = self.graph.graph.edges(node_idx).count();
-            if outgoing == 0 {
-                if let Some(node) = self.graph.graph.node_weight(node_idx) {
-                    dead_ends.push(node.step_id.clone());
-                }
+            if outgoing == 0
+                && let Some(node) = self.graph.graph.node_weight(node_idx)
+            {
+                dead_ends.push(node.step_id.clone());
             }
         }
 
