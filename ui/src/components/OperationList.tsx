@@ -48,7 +48,7 @@ export const OperationList: React.FC = () => {
   const getMethodColor = (method: string): string => {
     switch (method.toUpperCase()) {
       case 'GET':
-        return '#0d6efd'; // Updated to primary blue
+        return '#0d6efd';
       case 'POST':
         return '#28a745';
       case 'PUT':

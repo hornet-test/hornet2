@@ -55,6 +55,8 @@ interface EditorState {
   toggleDataSourcePanel: () => void;
   toggleSuggestionPanel: () => void;
   addOperationToWorkflow: (operation: OperationInfo) => void;
+  removeStep: (workflowId: string, stepId: string) => void;
+  reorderSteps: (workflowId: string, oldIndex: number, newIndex: number) => void;
   analyzeDataFlows: () => void;
   applySuggestion: (suggestion: DataFlowSuggestion) => void;
   dismissSuggestion: (suggestion: DataFlowSuggestion) => void;
@@ -340,14 +342,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (arazzoSpec) {
       try {
         // Extract only workflows[0] for display
-        const workflowToEdit = arazzoSpec.workflows.length > 0
-          ? arazzoSpec.workflows[0]
-          : {
-              workflowId: 'workflow-1',
-              summary: 'New Workflow',
-              description: '',
-              steps: [],
-            };
+        const workflowToEdit =
+          arazzoSpec.workflows.length > 0
+            ? arazzoSpec.workflows[0]
+            : {
+                workflowId: 'workflow-1',
+                summary: 'New Workflow',
+                description: '',
+                steps: [],
+              };
 
         const yamlStr = yaml.dump(workflowToEdit, {
           indent: 2,
@@ -653,6 +656,65 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     get().setArazzoSpec(newSpec);
     // Analyze data flows after adding operation
+    get().analyzeDataFlows();
+  },
+
+  // Remove step from workflow
+  removeStep: (workflowId: string, stepId: string) => {
+    const { arazzoSpec, selectedStepId } = get();
+    if (!arazzoSpec) return;
+
+    const workflows = [...arazzoSpec.workflows];
+    const workflowIndex = workflows.findIndex((w) => w.workflowId === workflowId);
+    if (workflowIndex === -1) return;
+
+    const workflow = { ...workflows[workflowIndex] };
+    const steps = workflow.steps.filter((s) => s.stepId !== stepId);
+
+    workflow.steps = steps;
+    workflows[workflowIndex] = workflow;
+
+    const newSpec = {
+      ...arazzoSpec,
+      workflows,
+    };
+
+    // Clear selection if removed step was selected
+    if (selectedStepId === stepId) {
+      set({ selectedStepId: null });
+    }
+
+    get().setArazzoSpec(newSpec);
+    // Re-analyze data flows after removing step
+    get().analyzeDataFlows();
+  },
+
+  // Reorder steps in a workflow
+  reorderSteps: (workflowId: string, oldIndex: number, newIndex: number) => {
+    const { arazzoSpec } = get();
+    if (!arazzoSpec) return;
+
+    const workflows = [...arazzoSpec.workflows];
+    const workflowIndex = workflows.findIndex((w) => w.workflowId === workflowId);
+    if (workflowIndex === -1) return;
+
+    const workflow = { ...workflows[workflowIndex] };
+    const steps = [...workflow.steps];
+
+    // Reorder steps
+    const [movedStep] = steps.splice(oldIndex, 1);
+    steps.splice(newIndex, 0, movedStep);
+
+    workflow.steps = steps;
+    workflows[workflowIndex] = workflow;
+
+    const newSpec = {
+      ...arazzoSpec,
+      workflows,
+    };
+
+    get().setArazzoSpec(newSpec);
+    // Re-analyze data flows after reordering
     get().analyzeDataFlows();
   },
 
