@@ -390,11 +390,3 @@ make clean              # ビルド成果物をクリーンアップ
 3. `hornet2 visualize` でフローを確認
 4. `hornet2 run` でテスト実行
 5. HTML レポートで結果確認
-
-## 📄 ライセンス
-
-MIT License （予定）
-
----
-
-今後、仕様・設計・MVP について随時更新予定です。
