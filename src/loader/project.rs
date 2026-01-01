@@ -1,6 +1,7 @@
 use crate::error::{HornetError, Result};
 use crate::loader;
 use crate::models::arazzo::ArazzoSpec;
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -12,6 +13,8 @@ pub struct ProjectMetadata {
     pub arazzo_path: PathBuf,
     pub arazzo_spec: ArazzoSpec,
     pub openapi_paths: Vec<PathBuf>,
+    /// Map from OpenAPI file path to source description name
+    pub source_name_map: HashMap<PathBuf, String>,
 }
 
 /// プロジェクトスキャナー
@@ -102,7 +105,8 @@ impl ProjectScanner {
 
         let arazzo_spec = loader::load_arazzo(&arazzo_path)?;
 
-        let openapi_paths = self.discover_openapi_files(project_dir)?;
+        let (openapi_paths, source_name_map) =
+            self.resolve_source_descriptions(&arazzo_spec, project_dir)?;
 
         Ok(ProjectMetadata {
             name: project_name,
@@ -110,32 +114,71 @@ impl ProjectScanner {
             arazzo_path,
             arazzo_spec,
             openapi_paths,
+            source_name_map,
         })
     }
 
-    /// OpenAPIファイルを発見
-    fn discover_openapi_files(&self, project_dir: &Path) -> Result<Vec<PathBuf>> {
-        let mut openapi_files = Vec::new();
+    /// Resolve OpenAPI files from Arazzo sourceDescriptions
+    fn resolve_source_descriptions(
+        &self,
+        arazzo_spec: &ArazzoSpec,
+        project_dir: &Path,
+    ) -> Result<(Vec<PathBuf>, HashMap<PathBuf, String>)> {
+        let mut openapi_paths = Vec::new();
+        let mut source_name_map = HashMap::new();
 
-        for entry in fs::read_dir(project_dir).map_err(HornetError::IoError)? {
-            let entry = entry.map_err(HornetError::IoError)?;
-
-            let path = entry.path();
-
-            if path.is_file()
-                && let Some(filename) = path.file_name().and_then(|n| n.to_str())
-                && (filename.starts_with("openapi")
-                    || filename == "openapi.yaml"
-                    || filename == "openapi.yml")
-                && (filename.ends_with(".yaml") || filename.ends_with(".yml"))
-            {
-                openapi_files.push(path);
-            }
+        // sourceDescriptions must be defined
+        if arazzo_spec.source_descriptions.is_empty() {
+            return Err(HornetError::ArazzoLoadError(
+                "arazzo.yaml must define sourceDescriptions with OpenAPI files".into(),
+            ));
         }
 
-        openapi_files.sort();
+        // Process sourceDescriptions
+        for source_desc in &arazzo_spec.source_descriptions {
+            // Filter by type (only process "openapi" sources)
+            let source_type = source_desc.source_type.as_deref().unwrap_or("openapi");
 
-        Ok(openapi_files)
+            if source_type != "openapi" {
+                continue;
+            }
+
+            // Resolve URL (relative path or external URL)
+            let path = if source_desc.url.starts_with("http://")
+                || source_desc.url.starts_with("https://")
+            {
+                // External URL: Not supported yet
+                return Err(HornetError::OpenApiLoadError(format!(
+                    "External OpenAPI URLs are not yet supported: {}",
+                    source_desc.url
+                )));
+            } else {
+                // Relative path: resolve from project directory
+                let relative = source_desc.url.trim_start_matches("./");
+                project_dir.join(relative)
+            };
+
+            // Check if file exists
+            if !path.exists() {
+                return Err(HornetError::OpenApiLoadError(format!(
+                    "OpenAPI file not found: {} (referenced in sourceDescriptions as '{}')",
+                    path.display(),
+                    source_desc.name
+                )));
+            }
+
+            openapi_paths.push(path.clone());
+            source_name_map.insert(path, source_desc.name.clone());
+        }
+
+        // Ensure at least one OpenAPI source was found
+        if openapi_paths.is_empty() {
+            return Err(HornetError::ArazzoLoadError(
+                "No OpenAPI sources found in sourceDescriptions (all sources may be non-openapi type)".into(),
+            ));
+        }
+
+        Ok((openapi_paths, source_name_map))
     }
 }
 
@@ -159,7 +202,10 @@ mod tests {
 info:
   title: Project 1
   version: 1.0.0
-sourceDescriptions: []
+sourceDescriptions:
+  - name: api1
+    url: ./openapi.yaml
+    type: openapi
 workflows:
   - workflowId: test
     steps:
@@ -194,12 +240,31 @@ paths:
 info:
   title: Project 2
   version: 1.0.0
-sourceDescriptions: []
+sourceDescriptions:
+  - name: api2
+    url: ./openapi.yaml
+    type: openapi
 workflows:
   - workflowId: test2
     steps:
       - stepId: step1
         operationId: op2
+"#,
+        )
+        .unwrap();
+        fs::write(
+            project2.join("openapi.yaml"),
+            r#"openapi: 3.0.0
+info:
+  title: API 2
+  version: 1.0.0
+paths:
+  /test2:
+    get:
+      operationId: op2
+      responses:
+        '200':
+          description: OK
 "#,
         )
         .unwrap();

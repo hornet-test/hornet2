@@ -136,7 +136,22 @@ pub struct ProjectData {
 impl ProjectData {
     pub fn from_metadata(meta: ProjectMetadata) -> Result<Self> {
         let mut resolver = OpenApiResolver::new(&meta.directory);
-        resolver.load_specs(&meta.openapi_paths)?;
+
+        // Load specs with names from sourceDescriptions
+        for path in &meta.openapi_paths {
+            let name = meta
+                .source_name_map
+                .get(path)
+                .map(|s| s.as_str())
+                .unwrap_or_else(|| {
+                    // Fallback to file stem if not in map (shouldn't happen)
+                    path.file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("openapi")
+                });
+
+            resolver.load_spec(name, path)?;
+        }
 
         Ok(Self {
             name: meta.name,

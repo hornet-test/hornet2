@@ -20,13 +20,32 @@ async fn test_crud_api_multi_project() {
     let project_dir = root_path.join("project1");
     std::fs::create_dir(&project_dir).unwrap();
 
+    // Create openapi.yaml in project1
+    let openapi_yaml = r#"
+openapi: 3.0.0
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /test:
+    get:
+      operationId: getTest
+      responses:
+        '200':
+          description: OK
+"#;
+    std::fs::write(project_dir.join("openapi.yaml"), openapi_yaml).unwrap();
+
     // Create arazzo.yaml in project1
     let yaml = r#"
 arazzo: 1.0.0
 info:
   title: Test Workflow
   version: 1.0.0
-sourceDescriptions: []
+sourceDescriptions:
+  - name: connection
+    url: openapi.yaml
+    type: openapi
 workflows:
   - workflowId: test-flow
     steps:
@@ -51,6 +70,10 @@ workflows:
         .route(
             "/api/projects/{project_name}/arazzo",
             get(api::get_project_arazzo).put(api::update_project_arazzo),
+        )
+        .route(
+            "/api/projects/{project_name}/openapi",
+            get(api::get_project_openapi),
         )
         .route(
             "/api/projects/{project_name}/workflows",
@@ -83,7 +106,27 @@ workflows:
     let spec: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
     assert_eq!(spec["info"]["title"], "Test Workflow");
 
-    // 2. GET /api/projects/project1/workflows - List all workflows
+    // 2. GET /api/projects/project1/openapi - Get merged OpenAPI spec
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/projects/project1/openapi")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let openapi: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+    assert_eq!(openapi["info"]["title"], "Test API");
+    assert!(openapi["paths"]["/test"].is_object());
+
+    // 3. GET /api/projects/project1/workflows - List all workflows
     let response = app
         .clone()
         .oneshot(
@@ -102,7 +145,7 @@ workflows:
     let workflows: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
     assert_eq!(workflows["workflows"][0]["workflow_id"], "test-flow");
 
-    // 3. GET /api/projects/project1/workflows/test-flow - Get specific workflow
+    // 4. GET /api/projects/project1/workflows/test-flow - Get specific workflow
     let response = app
         .clone()
         .oneshot(
@@ -121,7 +164,7 @@ workflows:
     let workflow: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
     assert_eq!(workflow["workflowId"], "test-flow");
 
-    // 4. POST /api/projects/project1/workflows - Create new workflow
+    // 5. POST /api/projects/project1/workflows - Create new workflow
     let new_workflow_req = serde_json::json!({
         "workflow": {
             "workflowId": "new-flow",
@@ -154,7 +197,7 @@ workflows:
     let content = std::fs::read_to_string(project_dir.join("arazzo.yaml")).unwrap();
     assert!(content.contains("new-flow"));
 
-    // 5. PUT /api/projects/project1/workflows/test-flow - Update workflow
+    // 6. PUT /api/projects/project1/workflows/test-flow - Update workflow
     let updated_workflow = serde_json::json!({
         "workflowId": "test-flow",
         "summary": "Updated Workflow",
@@ -181,7 +224,7 @@ workflows:
 
     assert_eq!(response.status(), StatusCode::OK);
 
-    // 6. DELETE /api/projects/project1/workflows/test-flow
+    // 7. DELETE /api/projects/project1/workflows/test-flow
     let response = app
         .clone()
         .oneshot(
