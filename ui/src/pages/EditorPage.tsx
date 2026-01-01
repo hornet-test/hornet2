@@ -122,30 +122,6 @@ export const EditorPage: React.FC = () => {
     [setSearchParams],
   );
 
-  if (isLoading) {
-    return (
-      <div className="editor-page">
-        <div className="loading-state">
-          <div className="spinner"></div>
-          <p>Loading operations...</p>
-        </div>
-        <style>{getStyles()}</style>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="editor-page">
-        <div className="error-state">
-          <h3>Error</h3>
-          <p>{error}</p>
-        </div>
-        <style>{getStyles()}</style>
-      </div>
-    );
-  }
-
   // Get available data sources
   const dataSources = getAvailableDataSources();
 
@@ -301,6 +277,30 @@ export const EditorPage: React.FC = () => {
         />
       )}
 
+      {error && (
+        <div className="error-banner">
+          <span>⚠️ {error}</span>
+          <button
+            className="error-close-btn"
+            onClick={() => useEditorStore.setState({ error: null })}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {(isLoading || isSaving) && (
+        <div className="loading-overlay">
+          <div className="loading-overlay-content">
+            <div className="spinner"></div>
+            <p>
+              {isLoading && 'Loading operations...'}
+              {isSaving && 'Saving workflow...'}
+            </p>
+          </div>
+        </div>
+      )}
+
       <style>{getStyles()}</style>
     </div>
   );
@@ -315,21 +315,11 @@ function getStyles() {
       overflow: hidden;
     }
 
-    .loading-state,
-    .error-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      color: #6c757d;
-    }
-
     .spinner {
       width: 40px;
       height: 40px;
-      border: 4px solid #f3f3f3;
-      border-top: 4px solid #0d6efd;
+      border: 4px solid rgba(255, 255, 255, 0.3);
+      border-top: 4px solid white;
       border-radius: 50%;
       animation: spin 1s linear infinite;
       margin-bottom: 1rem;
@@ -344,18 +334,57 @@ function getStyles() {
       }
     }
 
-    .error-state h3 {
-      color: #dc3545;
-      margin: 0 0 0.5rem 0;
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      animation: fadeIn 0.2s ease-in-out;
     }
 
-    .error-state p {
+    .loading-overlay-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .loading-overlay-content p {
+      color: white;
+      font-size: 1rem;
+      font-weight: 500;
       margin: 0;
-      font-family: 'Courier New', monospace;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+
+    .error-banner {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 1.5rem;
       background: #f8d7da;
-      padding: 1rem;
-      border-radius: 4px;
-      border: 1px solid #f5c6cb;
+      color: #842029;
+      border-bottom: 1px solid #f5c2c7;
+      font-size: 0.875rem;
+      z-index: 10000;
     }
 
     .editor-toolbar {
