@@ -4,6 +4,7 @@ import { Controls } from '../components/Controls';
 import { CytoscapeView } from '../components/CytoscapeView';
 import { DetailsPanel } from '../components/DetailsPanel';
 import { StatusBar } from '../components/StatusBar';
+import ApiDocDrawer from '../components/ApiDocDrawer';
 import type {
   GraphData,
   LayoutOption,
@@ -12,6 +13,7 @@ import type {
   WorkflowSummary,
 } from '../types/graph';
 import { useProjectStore } from '../stores/projectStore';
+import { useEditorStore } from '../stores/editorStore';
 
 const layoutOptions: LayoutOption[] = [
   { value: 'dagre', label: 'Hierarchical (Dagre)' },
@@ -31,16 +33,23 @@ export const VisualizationPage: React.FC = () => {
   const [graph, setGraph] = useState<GraphData | null>(null);
   const [selectedNode, setSelectedNode] = useState<SelectedNode | null>(null);
 
+  // Editor store hooks for API docs
+  const operations = useEditorStore((state) => state.operations);
+  const openApiDocDrawer = useEditorStore((state) => state.openApiDocDrawer);
+  const closeApiDocDrawer = useEditorStore((state) => state.closeApiDocDrawer);
+  const setSelectedOperation = useEditorStore((state) => state.setSelectedOperation);
+  const loadOperations = useEditorStore((state) => state.loadOperations);
+  const loadOpenApiSpec = useEditorStore((state) => state.loadOpenApiSpec);
+
   // Read state from URL query parameters
   const selectedWorkflow = searchParams.get('workflow') || '';
   const layout = (searchParams.get('layout') as LayoutOption['value']) || 'dagre';
+  const urlOperationId = searchParams.get('operation');
 
   const selectedWorkflowLabel = useMemo(
     () => workflows.find((wf) => wf.workflow_id === selectedWorkflow)?.workflow_id ?? '',
     [selectedWorkflow, workflows],
   );
-
-  // Removed fetchProjects and replaced with store usage is implicit by removing the definition
 
   const fetchWorkflows = useCallback(async () => {
     if (!project) return;
@@ -95,19 +104,32 @@ export const VisualizationPage: React.FC = () => {
     [project],
   );
 
-  // Removed fetchProjects effect
-
   useEffect(() => {
     if (project) {
       void fetchWorkflows();
+      void loadOperations(project);
+      void loadOpenApiSpec(project);
     }
-  }, [project, fetchWorkflows]);
+  }, [project, fetchWorkflows, loadOperations, loadOpenApiSpec]);
 
   useEffect(() => {
     if (selectedWorkflow && project) {
       void fetchGraph(selectedWorkflow);
     }
   }, [fetchGraph, selectedWorkflow, project]);
+
+  // Sync operation and drawer state from URL to store
+  useEffect(() => {
+    if (urlOperationId && operations.length > 0) {
+      const operation = operations.find((op) => op.operation_id === urlOperationId);
+      if (operation) {
+        setSelectedOperation(operation);
+        openApiDocDrawer(urlOperationId);
+      }
+    } else {
+      closeApiDocDrawer();
+    }
+  }, [urlOperationId, operations, setSelectedOperation, openApiDocDrawer, closeApiDocDrawer]);
 
   const handleWorkflowChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     setSearchParams((params) => {
@@ -128,6 +150,23 @@ export const VisualizationPage: React.FC = () => {
     setSelectedNode(null);
     void fetchWorkflows();
   };
+
+  const handleOpenApiDocs = useCallback(
+    (operationId: string) => {
+      setSearchParams((params) => {
+        params.set('operation', operationId);
+        return params;
+      });
+    },
+    [setSearchParams],
+  );
+
+  const handleCloseApiDocs = useCallback(() => {
+    setSearchParams((params) => {
+      params.delete('operation');
+      return params;
+    });
+  }, [setSearchParams]);
 
   const handleNodeSelected = useCallback((data: SelectedNode) => {
     setSelectedNode(data);
@@ -156,10 +195,13 @@ export const VisualizationPage: React.FC = () => {
           onNodeSelected={handleNodeSelected}
           onCanvasCleared={handleCanvasCleared}
         />
-        <DetailsPanel nodeData={selectedNode} />
+        <DetailsPanel nodeData={selectedNode} onViewDocs={handleOpenApiDocs} />
       </div>
 
       <StatusBar message={status.message} type={status.type} />
+
+      {/* API Documentation Drawer */}
+      <ApiDocDrawer onClose={handleCloseApiDocs} />
 
       <style>{`
         .visualization-page {

@@ -316,6 +316,65 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/projects/{project_name}/openapi:
+    parameters:
+      - $ref: '#/components/parameters/ProjectName'
+    get:
+      summary: Get project OpenAPI specification
+      description: |
+        Returns the merged OpenAPI 3.x specification for a project.
+        When multiple OpenAPI files exist (e.g., openapi.yaml, openapi-v2.yaml),
+        they are merged into a single specification using alphabetical ordering
+        with "last wins" conflict resolution.
+      operationId: getProjectOpenApi
+      tags: [Editor]
+      responses:
+        '200':
+          description: OpenAPI 3.x specification
+          content:
+            application/json:
+              schema:
+                type: object
+                description: Complete OpenAPI 3.x specification document
+                properties:
+                  openapi:
+                    type: string
+                    example: "3.0.3"
+                  info:
+                    type: object
+                  servers:
+                    type: array
+                  paths:
+                    type: object
+                  components:
+                    type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+          description: Invalid project name (contains path separators or parent directory references)
+        '404':
+          description: Project not found or no OpenAPI files found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+              examples:
+                projectNotFound:
+                  summary: Project does not exist
+                  value:
+                    type: "https://hornet2.dev/problems/project-not-found"
+                    title: "Project Not Found"
+                    status: 404
+                    detail: "Project 'example' not found: no such directory"
+                openapiNotFound:
+                  summary: Project has no OpenAPI files
+                  value:
+                    type: "https://hornet2.dev/problems/openapi-not-found"
+                    title: "OpenAPI Not Found"
+                    status: 404
+                    detail: "Project 'example' has no OpenAPI files"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /api/validate:
     post:
       summary: Validate Arazzo YAML

@@ -30,6 +30,7 @@ interface SortableStepProps {
   workflowId: string;
   onStepClick: (stepId: string) => void;
   onRemoveStep: (workflowId: string, stepId: string) => void;
+  onViewDocs: (operationId: string) => void;
 }
 
 const SortableStep: React.FC<SortableStepProps> = ({
@@ -40,6 +41,7 @@ const SortableStep: React.FC<SortableStepProps> = ({
   workflowId,
   onStepClick,
   onRemoveStep,
+  onViewDocs,
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: step.stepId,
@@ -105,6 +107,18 @@ const SortableStep: React.FC<SortableStepProps> = ({
               </div>
             )}
           </div>
+        )}
+
+        {isSelected && step.operationId && (
+          <button
+            className="view-docs-link"
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewDocs(step.operationId!);
+            }}
+          >
+            📖 View API Docs
+          </button>
         )}
       </div>
 
@@ -259,6 +273,26 @@ const SortableStep: React.FC<SortableStepProps> = ({
           margin-bottom: 0.25rem;
         }
 
+        .view-docs-link {
+          margin-top: 0.75rem;
+          padding: 0.5rem 1rem;
+          background: #e7f1ff;
+          color: #0d6efd;
+          border: 1px solid #0d6efd;
+          border-radius: 4px;
+          font-size: 0.8rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+          width: 100%;
+          text-align: center;
+        }
+
+        .view-docs-link:hover {
+          background: #0d6efd;
+          color: white;
+        }
+
         .delete-button {
           display: flex;
           align-items: center;
@@ -285,7 +319,11 @@ const SortableStep: React.FC<SortableStepProps> = ({
   );
 };
 
-export const WorkflowView: React.FC = () => {
+interface WorkflowViewProps {
+  onViewDocs?: (operationId: string) => void;
+}
+
+export const WorkflowView: React.FC<WorkflowViewProps> = ({ onViewDocs }) => {
   const { arazzoSpec, selectedStepId, setSelectedStepId, operations, removeStep, reorderSteps } =
     useEditorStore();
 
@@ -390,6 +428,7 @@ export const WorkflowView: React.FC = () => {
                         workflowId={wfId}
                         onStepClick={handleStepClick}
                         onRemoveStep={removeStep}
+                        onViewDocs={onViewDocs || (() => {})}
                       />
                     );
                   })}

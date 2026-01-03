@@ -12,6 +12,8 @@ use crate::{
     models::arazzo::{ArazzoSpec, Workflow},
     server::state::AppState,
 };
+use oas3::OpenApiV3Spec;
+use std::collections::HashMap;
 
 /// RFC 9457 Problem Details for HTTP APIs
 /// https://datatracker.ietf.org/doc/html/rfc9457
@@ -1274,4 +1276,486 @@ pub async fn get_arazzo_spec() -> ApiResult<Json<serde_json::Value>> {
     })?;
 
     Ok(Json(spec))
+}
+
+// ============================================================================
+// Project OpenAPI Specification Endpoint
+// ============================================================================
+
+/// GET /api/projects/{project_name}/openapi - Get merged OpenAPI specification for a project
+#[tracing::instrument(
+    name = "api.get_project_openapi",
+    skip(state),
+    fields(project_name = %project_name, spec_count = tracing::field::Empty)
+)]
+pub async fn get_project_openapi(
+    State(state): State<AppState>,
+    Path(project_name): Path<String>,
+) -> ApiResult<Json<serde_json::Value>> {
+    // 1. Validate project name (path traversal check)
+    if project_name.contains("..") || project_name.contains('/') || project_name.contains('\\') {
+        return Err(ProblemDetails::new(
+            StatusCode::BAD_REQUEST,
+            "invalid-project-name",
+            "Invalid Request",
+            "Project name contains invalid characters".into(),
+        ));
+    }
+
+    // 2. Acquire cache lock
+    let mut cache = state.projects.write().map_err(|_| {
+        ProblemDetails::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "cache-lock-failed",
+            "Internal Error",
+            "Failed to acquire project cache lock".into(),
+        )
+    })?;
+
+    // 3. Get project from cache
+    let project = cache
+        .get_project(&project_name, &state.root_dir)
+        .map_err(|e| {
+            ProblemDetails::new(
+                StatusCode::NOT_FOUND,
+                "project-not-found",
+                "Project Not Found",
+                format!("Project '{}' not found: {}", project_name, e),
+            )
+        })?;
+
+    // 4. Get all OpenAPI specs
+    let specs = project.openapi_resolver.get_all_specs();
+    let spec_count = specs.len();
+    tracing::Span::current().record("spec_count", spec_count);
+
+    if spec_count == 0 {
+        return Err(ProblemDetails::new(
+            StatusCode::NOT_FOUND,
+            "openapi-not-found",
+            "OpenAPI Not Found",
+            format!("Project '{}' has no OpenAPI files", project_name),
+        ));
+    }
+
+    // 5. Merge or return single spec
+    let result_spec = if spec_count == 1 {
+        let (_, spec) = specs.iter().next().unwrap();
+        serde_json::to_value(spec).map_err(|e| {
+            ProblemDetails::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "serialization-failed",
+                "Internal Error",
+                format!("Failed to serialize OpenAPI spec: {}", e),
+            )
+        })?
+    } else {
+        merge_openapi_specs(specs)?
+    };
+
+    Ok(Json(result_spec))
+}
+
+/// Helper function to merge multiple OpenAPI specifications into one
+fn merge_openapi_specs(
+    specs: &HashMap<String, OpenApiV3Spec>,
+) -> Result<serde_json::Value, ProblemDetails> {
+    // 1. Sort specs by name for deterministic order
+    let mut sorted_names: Vec<&String> = specs.keys().collect();
+    sorted_names.sort();
+
+    // 2. Start with first spec serialized to Value for easy manipulation
+    let first_name = sorted_names[0];
+    let first_spec = &specs[first_name];
+    let mut merged = serde_json::to_value(first_spec).map_err(|e| {
+        ProblemDetails::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "serialization-failed",
+            "Internal Error",
+            format!("Failed to serialize base spec: {}", e),
+        )
+    })?;
+
+    // 3. Merge remaining specs
+    for spec_name in sorted_names.iter().skip(1) {
+        let spec = &specs[*spec_name];
+        let spec_value = serde_json::to_value(spec).map_err(|e| {
+            ProblemDetails::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "serialization-failed",
+                "Internal Error",
+                format!("Failed to serialize spec '{}': {}", spec_name, e),
+            )
+        })?;
+
+        // Merge paths
+        if let Some(paths) = spec_value.get("paths")
+            && let Some(merged_paths) = merged.get_mut("paths")
+            && let Some(paths_obj) = paths.as_object()
+            && let Some(merged_paths_obj) = merged_paths.as_object_mut()
+        {
+            for (path, path_item) in paths_obj {
+                merged_paths_obj.insert(path.clone(), path_item.clone());
+            }
+        }
+
+        // Merge components (schemas, parameters, responses, etc.)
+        if let Some(components) = spec_value.get("components")
+            && let Some(components_obj) = components.as_object()
+        {
+            let merged_components = merged.get_mut("components").and_then(|c| c.as_object_mut());
+
+            if let Some(merged_comp_obj) = merged_components {
+                for (comp_type, comp_items) in components_obj {
+                    if let Some(items_obj) = comp_items.as_object() {
+                        let merged_items = merged_comp_obj
+                            .entry(comp_type.clone())
+                            .or_insert(serde_json::json!({}));
+
+                        if let Some(merged_items_obj) = merged_items.as_object_mut() {
+                            for (name, item) in items_obj {
+                                merged_items_obj.insert(name.clone(), item.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Merge tags (deduplicate by name)
+        if let Some(tags) = spec_value.get("tags")
+            && let Some(tags_arr) = tags.as_array()
+        {
+            let merged_tags = merged.get_mut("tags").and_then(|t| t.as_array_mut());
+
+            if let Some(merged_tags_arr) = merged_tags {
+                for tag in tags_arr {
+                    if let Some(tag_name) = tag.get("name")
+                        && !merged_tags_arr
+                            .iter()
+                            .any(|t| t.get("name") == Some(tag_name))
+                    {
+                        merged_tags_arr.push(tag.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(merged)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_merge_openapi_specs_single_spec() {
+        let mut specs = HashMap::new();
+
+        let spec1 = create_test_spec_from_yaml(
+            r#"
+openapi: 3.0.0
+info:
+  title: API 1
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      operationId: getUsers
+      responses:
+        '200':
+          description: OK
+"#,
+        );
+
+        specs.insert("api1".to_string(), spec1);
+
+        let result = merge_openapi_specs(&specs);
+        assert!(result.is_ok());
+
+        let merged = result.unwrap();
+        assert_eq!(merged["info"]["title"], "API 1");
+        assert!(merged["paths"].get("/users").is_some());
+    }
+
+    #[test]
+    fn test_merge_openapi_specs_multiple_paths() {
+        let mut specs = HashMap::new();
+
+        let spec1 = create_test_spec_from_yaml(
+            r#"
+openapi: 3.0.0
+info:
+  title: API 1
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      operationId: getUsers
+      responses:
+        '200':
+          description: OK
+"#,
+        );
+
+        let spec2 = create_test_spec_from_yaml(
+            r#"
+openapi: 3.0.0
+info:
+  title: API 2
+  version: 1.0.0
+paths:
+  /posts:
+    get:
+      operationId: getPosts
+      responses:
+        '200':
+          description: OK
+"#,
+        );
+
+        specs.insert("api1".to_string(), spec1);
+        specs.insert("api2".to_string(), spec2);
+
+        let result = merge_openapi_specs(&specs);
+        assert!(result.is_ok());
+
+        let merged = result.unwrap();
+        let paths = merged["paths"].as_object().unwrap();
+        assert_eq!(paths.len(), 2);
+        assert!(paths.contains_key("/users"));
+        assert!(paths.contains_key("/posts"));
+    }
+
+    #[test]
+    fn test_merge_openapi_specs_components() {
+        let mut specs = HashMap::new();
+
+        let spec1 = create_test_spec_from_yaml(
+            r#"
+openapi: 3.0.0
+info:
+  title: API 1
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+"#,
+        );
+
+        let spec2 = create_test_spec_from_yaml(
+            r#"
+openapi: 3.0.0
+info:
+  title: API 2
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    Post:
+      type: object
+      properties:
+        id:
+          type: string
+"#,
+        );
+
+        specs.insert("api1".to_string(), spec1);
+        specs.insert("api2".to_string(), spec2);
+
+        let result = merge_openapi_specs(&specs);
+        assert!(result.is_ok());
+
+        let merged = result.unwrap();
+        let components = merged["components"]["schemas"].as_object().unwrap();
+        assert_eq!(components.len(), 2);
+        assert!(components.contains_key("User"));
+        assert!(components.contains_key("Post"));
+    }
+
+    #[test]
+    fn test_merge_openapi_specs_tags_deduplication() {
+        let mut specs = HashMap::new();
+
+        let spec1 = create_test_spec_from_yaml(
+            r#"
+openapi: 3.0.0
+info:
+  title: API 1
+  version: 1.0.0
+paths: {}
+tags:
+  - name: users
+    description: User operations
+  - name: common
+    description: Common operations
+"#,
+        );
+
+        let spec2 = create_test_spec_from_yaml(
+            r#"
+openapi: 3.0.0
+info:
+  title: API 2
+  version: 1.0.0
+paths: {}
+tags:
+  - name: posts
+    description: Post operations
+  - name: common
+    description: Common operations
+"#,
+        );
+
+        specs.insert("api1".to_string(), spec1);
+        specs.insert("api2".to_string(), spec2);
+
+        let result = merge_openapi_specs(&specs);
+        assert!(result.is_ok());
+
+        let merged = result.unwrap();
+        let tags = merged["tags"].as_array().unwrap();
+        assert_eq!(tags.len(), 3); // users, common, posts (common not duplicated)
+
+        let tag_names: Vec<&str> = tags.iter().filter_map(|t| t["name"].as_str()).collect();
+
+        assert!(tag_names.contains(&"users"));
+        assert!(tag_names.contains(&"posts"));
+        assert!(tag_names.contains(&"common"));
+
+        // Verify "common" appears only once
+        let common_count = tag_names.iter().filter(|&&name| name == "common").count();
+        assert_eq!(common_count, 1);
+    }
+
+    #[test]
+    fn test_merge_openapi_specs_multiple_components() {
+        let mut specs = HashMap::new();
+
+        let spec1 = create_test_spec_from_yaml(
+            r#"
+openapi: 3.0.0
+info:
+  title: API 1
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    User:
+      type: object
+  parameters:
+    userId:
+      name: userId
+      in: query
+      required: true
+      schema:
+        type: string
+"#,
+        );
+
+        let spec2 = create_test_spec_from_yaml(
+            r#"
+openapi: 3.0.0
+info:
+  title: API 2
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    Post:
+      type: object
+"#,
+        );
+
+        specs.insert("api1".to_string(), spec1);
+        specs.insert("api2".to_string(), spec2);
+
+        let result = merge_openapi_specs(&specs);
+        assert!(result.is_ok());
+
+        let merged = result.unwrap();
+        let schemas = merged["components"]["schemas"].as_object().unwrap();
+        assert!(schemas.contains_key("User"));
+        assert!(schemas.contains_key("Post"));
+
+        let params = merged["components"]["parameters"].as_object().unwrap();
+        assert!(params.contains_key("userId"));
+    }
+
+    #[test]
+    fn test_merge_openapi_specs_deterministic_order() {
+        let mut specs = HashMap::new();
+
+        let spec1 = create_test_spec_from_yaml(
+            r#"
+openapi: 3.0.0
+info:
+  title: API 1
+  version: 1.0.0
+paths:
+  /a:
+    get:
+      responses:
+        '200':
+          description: OK
+"#,
+        );
+
+        let spec2 = create_test_spec_from_yaml(
+            r#"
+openapi: 3.0.0
+info:
+  title: API 2
+  version: 1.0.0
+paths:
+  /b:
+    get:
+      responses:
+        '200':
+          description: OK
+"#,
+        );
+
+        let spec3 = create_test_spec_from_yaml(
+            r#"
+openapi: 3.0.0
+info:
+  title: API 3
+  version: 1.0.0
+paths:
+  /c:
+    get:
+      responses:
+        '200':
+          description: OK
+"#,
+        );
+
+        specs.insert("api1".to_string(), spec1);
+        specs.insert("api2".to_string(), spec2);
+        specs.insert("api3".to_string(), spec3);
+
+        let result1 = merge_openapi_specs(&specs);
+        let result2 = merge_openapi_specs(&specs);
+
+        assert!(result1.is_ok());
+        assert!(result2.is_ok());
+
+        // Results should be identical (deterministic)
+        assert_eq!(
+            serde_json::to_string(&result1.unwrap()).unwrap(),
+            serde_json::to_string(&result2.unwrap()).unwrap()
+        );
+    }
+
+    // Helper function to create OpenAPI spec from YAML
+    fn create_test_spec_from_yaml(yaml: &str) -> OpenApiV3Spec {
+        serde_yaml::from_str(yaml).expect("Failed to parse OpenAPI YAML")
+    }
 }

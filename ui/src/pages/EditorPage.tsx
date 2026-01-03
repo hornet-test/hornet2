@@ -7,6 +7,7 @@ import { DataSourcePanel } from '../components/DataSourcePanel';
 import { SuggestionPanel } from '../components/SuggestionPanel';
 import { WorkflowSelector } from '../components/WorkflowSelector';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import ApiDocDrawer from '../components/ApiDocDrawer';
 import { useEditorStore } from '../stores/editorStore';
 import { useProjectStore } from '../stores/projectStore';
 
@@ -30,6 +31,7 @@ export const EditorPage: React.FC = () => {
     applySuggestion,
     dismissSuggestion,
     loadOperations,
+    loadOpenApiSpec,
     workflows,
     currentWorkflowId,
     isDirty,
@@ -40,19 +42,26 @@ export const EditorPage: React.FC = () => {
     saveWorkflow,
     createNewWorkflow,
   } = useEditorStore();
+
+  const openApiDocDrawer = useEditorStore((state) => state.openApiDocDrawer);
+  const closeApiDocDrawer = useEditorStore((state) => state.closeApiDocDrawer);
+  const setSelectedOperation = useEditorStore((state) => state.setSelectedOperation);
+
   const [showUnsavedWarning, setShowUnsavedWarning] = useState(false);
   const [pendingAction, setPendingAction] = useState<'load' | 'new' | null>(null);
   const [pendingWorkflowId, setPendingWorkflowId] = useState<string | null>(null);
 
-  // Read view mode from URL query parameters
+  // Read view mode and operation from URL query parameters
   const viewMode = (searchParams.get('mode') as 'visual' | 'yaml' | 'split') || 'split';
+  const urlOperationId = searchParams.get('operation');
 
   useEffect(() => {
     if (currentProject) {
       void loadOperations(currentProject);
       void loadWorkflows(currentProject);
+      void loadOpenApiSpec(currentProject);
     }
-  }, [loadOperations, loadWorkflows, currentProject]);
+  }, [loadOperations, loadWorkflows, loadOpenApiSpec, currentProject]);
 
   // Sync workflow from URL to store
   useEffect(() => {
@@ -61,6 +70,19 @@ export const EditorPage: React.FC = () => {
       void loadWorkflow(currentProject, urlWorkflowId);
     }
   }, [searchParams, currentWorkflowId, currentProject, loadWorkflow]);
+
+  // Sync operation and drawer state from URL to store
+  useEffect(() => {
+    if (urlOperationId && operations.length > 0) {
+      const operation = operations.find((op) => op.operation_id === urlOperationId);
+      if (operation) {
+        setSelectedOperation(operation);
+        openApiDocDrawer(urlOperationId);
+      }
+    } else {
+      closeApiDocDrawer();
+    }
+  }, [urlOperationId, operations, setSelectedOperation, openApiDocDrawer, closeApiDocDrawer]);
 
   // Handle workflow selection
   const handleWorkflowSelect = useCallback(
@@ -121,6 +143,25 @@ export const EditorPage: React.FC = () => {
     },
     [setSearchParams],
   );
+
+  // Handle opening API docs drawer via URL
+  const handleOpenApiDocs = useCallback(
+    (operationId: string) => {
+      setSearchParams((params) => {
+        params.set('operation', operationId);
+        return params;
+      });
+    },
+    [setSearchParams],
+  );
+
+  // Handle closing API docs drawer
+  const handleCloseApiDocs = useCallback(() => {
+    setSearchParams((params) => {
+      params.delete('operation');
+      return params;
+    });
+  }, [setSearchParams]);
 
   // Get available data sources
   const dataSources = getAvailableDataSources();
@@ -207,7 +248,7 @@ export const EditorPage: React.FC = () => {
         <div className="main-area">
           {viewMode === 'visual' && (
             <div className="full-panel">
-              <WorkflowView />
+              <WorkflowView onViewDocs={handleOpenApiDocs} />
             </div>
           )}
 
@@ -220,7 +261,7 @@ export const EditorPage: React.FC = () => {
           {viewMode === 'split' && (
             <>
               <div className="split-panel">
-                <WorkflowView />
+                <WorkflowView onViewDocs={handleOpenApiDocs} />
               </div>
               <div className="split-panel">
                 <YamlEditor />
@@ -276,6 +317,9 @@ export const EditorPage: React.FC = () => {
           onCancel={() => setShowUnsavedWarning(false)}
         />
       )}
+
+      {/* API Documentation Drawer */}
+      <ApiDocDrawer onClose={handleCloseApiDocs} />
 
       {error && (
         <div className="error-banner">

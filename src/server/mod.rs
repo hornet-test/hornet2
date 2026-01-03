@@ -50,6 +50,10 @@ pub async fn start_server(addr: SocketAddr, root_dir: PathBuf) -> crate::Result<
             "/api/projects/{project_name}/operations",
             get(api::get_project_operations),
         )
+        .route(
+            "/api/projects/{project_name}/openapi",
+            get(api::get_project_openapi),
+        )
         .route("/api/validate", axum::routing::post(api::validate_arazzo))
         .route("/api/openapi.json", get(api::get_openapi_spec))
         .route("/api/arazzo.json", get(api::get_arazzo_spec))
