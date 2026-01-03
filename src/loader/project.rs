@@ -280,4 +280,296 @@ paths:
         assert!(projects.iter().any(|p| p.name == "project1"));
         assert!(projects.iter().any(|p| p.name == "project2"));
     }
+
+    #[test]
+    fn test_resolve_source_descriptions_empty() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_dir = temp_dir.path();
+
+        let arazzo_spec = ArazzoSpec {
+            arazzo: "1.0.0".to_string(),
+            info: crate::models::arazzo::Info {
+                title: "Test".to_string(),
+                version: "1.0.0".to_string(),
+                summary: None,
+                description: None,
+            },
+            source_descriptions: vec![],
+            workflows: vec![],
+            components: None,
+        };
+
+        let scanner = ProjectScanner::new(project_dir);
+        let result = scanner.resolve_source_descriptions(&arazzo_spec, project_dir);
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("must define sourceDescriptions"));
+    }
+
+    #[test]
+    fn test_resolve_source_descriptions_file_not_found() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_dir = temp_dir.path();
+
+        let arazzo_spec = ArazzoSpec {
+            arazzo: "1.0.0".to_string(),
+            info: crate::models::arazzo::Info {
+                title: "Test".to_string(),
+                version: "1.0.0".to_string(),
+                summary: None,
+                description: None,
+            },
+            source_descriptions: vec![crate::models::arazzo::SourceDescription {
+                name: "missing-api".to_string(),
+                url: "./nonexistent.yaml".to_string(),
+                source_type: Some("openapi".to_string()),
+            }],
+            workflows: vec![],
+            components: None,
+        };
+
+        let scanner = ProjectScanner::new(project_dir);
+        let result = scanner.resolve_source_descriptions(&arazzo_spec, project_dir);
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("OpenAPI file not found"));
+        assert!(err_msg.contains("missing-api"));
+    }
+
+    #[test]
+    fn test_resolve_source_descriptions_external_url() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_dir = temp_dir.path();
+
+        let arazzo_spec = ArazzoSpec {
+            arazzo: "1.0.0".to_string(),
+            info: crate::models::arazzo::Info {
+                title: "Test".to_string(),
+                version: "1.0.0".to_string(),
+                summary: None,
+                description: None,
+            },
+            source_descriptions: vec![crate::models::arazzo::SourceDescription {
+                name: "external-api".to_string(),
+                url: "https://example.com/openapi.yaml".to_string(),
+                source_type: Some("openapi".to_string()),
+            }],
+            workflows: vec![],
+            components: None,
+        };
+
+        let scanner = ProjectScanner::new(project_dir);
+        let result = scanner.resolve_source_descriptions(&arazzo_spec, project_dir);
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("External OpenAPI URLs are not yet supported"));
+    }
+
+    #[test]
+    fn test_resolve_source_descriptions_multiple_files() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_dir = temp_dir.path();
+
+        // Create multiple OpenAPI files
+        fs::write(
+            project_dir.join("api1.yaml"),
+            r#"openapi: 3.0.0
+info:
+  title: API 1
+  version: 1.0.0
+paths: {}
+"#,
+        )
+        .unwrap();
+
+        fs::write(
+            project_dir.join("api2.yaml"),
+            r#"openapi: 3.0.0
+info:
+  title: API 2
+  version: 1.0.0
+paths: {}
+"#,
+        )
+        .unwrap();
+
+        let arazzo_spec = ArazzoSpec {
+            arazzo: "1.0.0".to_string(),
+            info: crate::models::arazzo::Info {
+                title: "Test".to_string(),
+                version: "1.0.0".to_string(),
+                summary: None,
+                description: None,
+            },
+            source_descriptions: vec![
+                crate::models::arazzo::SourceDescription {
+                    name: "first-api".to_string(),
+                    url: "./api1.yaml".to_string(),
+                    source_type: Some("openapi".to_string()),
+                },
+                crate::models::arazzo::SourceDescription {
+                    name: "second-api".to_string(),
+                    url: "./api2.yaml".to_string(),
+                    source_type: Some("openapi".to_string()),
+                },
+            ],
+            workflows: vec![],
+            components: None,
+        };
+
+        let scanner = ProjectScanner::new(project_dir);
+        let result = scanner.resolve_source_descriptions(&arazzo_spec, project_dir);
+
+        assert!(result.is_ok());
+        let (paths, name_map) = result.unwrap();
+        assert_eq!(paths.len(), 2);
+        assert_eq!(name_map.len(), 2);
+
+        // Verify name mappings
+        let api1_path = project_dir.join("api1.yaml");
+        let api2_path = project_dir.join("api2.yaml");
+        assert_eq!(name_map.get(&api1_path), Some(&"first-api".to_string()));
+        assert_eq!(name_map.get(&api2_path), Some(&"second-api".to_string()));
+    }
+
+    #[test]
+    fn test_resolve_source_descriptions_all_non_openapi() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_dir = temp_dir.path();
+
+        let arazzo_spec = ArazzoSpec {
+            arazzo: "1.0.0".to_string(),
+            info: crate::models::arazzo::Info {
+                title: "Test".to_string(),
+                version: "1.0.0".to_string(),
+                summary: None,
+                description: None,
+            },
+            source_descriptions: vec![
+                crate::models::arazzo::SourceDescription {
+                    name: "graphql-api".to_string(),
+                    url: "./schema.graphql".to_string(),
+                    source_type: Some("graphql".to_string()),
+                },
+                crate::models::arazzo::SourceDescription {
+                    name: "grpc-api".to_string(),
+                    url: "./service.proto".to_string(),
+                    source_type: Some("grpc".to_string()),
+                },
+            ],
+            workflows: vec![],
+            components: None,
+        };
+
+        let scanner = ProjectScanner::new(project_dir);
+        let result = scanner.resolve_source_descriptions(&arazzo_spec, project_dir);
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("No OpenAPI sources found"));
+    }
+
+    #[test]
+    fn test_resolve_source_descriptions_mixed_types() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_dir = temp_dir.path();
+
+        // Create OpenAPI file only
+        fs::write(
+            project_dir.join("openapi.yaml"),
+            r#"openapi: 3.0.0
+info:
+  title: REST API
+  version: 1.0.0
+paths: {}
+"#,
+        )
+        .unwrap();
+
+        let arazzo_spec = ArazzoSpec {
+            arazzo: "1.0.0".to_string(),
+            info: crate::models::arazzo::Info {
+                title: "Test".to_string(),
+                version: "1.0.0".to_string(),
+                summary: None,
+                description: None,
+            },
+            source_descriptions: vec![
+                crate::models::arazzo::SourceDescription {
+                    name: "rest-api".to_string(),
+                    url: "./openapi.yaml".to_string(),
+                    source_type: Some("openapi".to_string()),
+                },
+                crate::models::arazzo::SourceDescription {
+                    name: "graphql-api".to_string(),
+                    url: "./schema.graphql".to_string(),
+                    source_type: Some("graphql".to_string()),
+                },
+            ],
+            workflows: vec![],
+            components: None,
+        };
+
+        let scanner = ProjectScanner::new(project_dir);
+        let result = scanner.resolve_source_descriptions(&arazzo_spec, project_dir);
+
+        // Should succeed with only the OpenAPI file
+        assert!(result.is_ok());
+        let (paths, name_map) = result.unwrap();
+        assert_eq!(paths.len(), 1);
+        assert_eq!(name_map.len(), 1);
+
+        let openapi_path = project_dir.join("openapi.yaml");
+        assert_eq!(name_map.get(&openapi_path), Some(&"rest-api".to_string()));
+    }
+
+    #[test]
+    fn test_resolve_source_descriptions_default_type() {
+        let temp_dir = TempDir::new().unwrap();
+        let project_dir = temp_dir.path();
+
+        fs::write(
+            project_dir.join("openapi.yaml"),
+            r#"openapi: 3.0.0
+info:
+  title: API
+  version: 1.0.0
+paths: {}
+"#,
+        )
+        .unwrap();
+
+        let arazzo_spec = ArazzoSpec {
+            arazzo: "1.0.0".to_string(),
+            info: crate::models::arazzo::Info {
+                title: "Test".to_string(),
+                version: "1.0.0".to_string(),
+                summary: None,
+                description: None,
+            },
+            source_descriptions: vec![crate::models::arazzo::SourceDescription {
+                name: "default-api".to_string(),
+                url: "./openapi.yaml".to_string(),
+                source_type: None, // No type specified - should default to "openapi"
+            }],
+            workflows: vec![],
+            components: None,
+        };
+
+        let scanner = ProjectScanner::new(project_dir);
+        let result = scanner.resolve_source_descriptions(&arazzo_spec, project_dir);
+
+        assert!(result.is_ok());
+        let (paths, name_map) = result.unwrap();
+        assert_eq!(paths.len(), 1);
+
+        let openapi_path = project_dir.join("openapi.yaml");
+        assert_eq!(
+            name_map.get(&openapi_path),
+            Some(&"default-api".to_string())
+        );
+    }
 }

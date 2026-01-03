@@ -1444,3 +1444,318 @@ fn merge_openapi_specs(
 
     Ok(merged)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_merge_openapi_specs_single_spec() {
+        let mut specs = HashMap::new();
+
+        let spec1 = create_test_spec_from_yaml(
+            r#"
+openapi: 3.0.0
+info:
+  title: API 1
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      operationId: getUsers
+      responses:
+        '200':
+          description: OK
+"#,
+        );
+
+        specs.insert("api1".to_string(), spec1);
+
+        let result = merge_openapi_specs(&specs);
+        assert!(result.is_ok());
+
+        let merged = result.unwrap();
+        assert_eq!(merged["info"]["title"], "API 1");
+        assert!(merged["paths"].get("/users").is_some());
+    }
+
+    #[test]
+    fn test_merge_openapi_specs_multiple_paths() {
+        let mut specs = HashMap::new();
+
+        let spec1 = create_test_spec_from_yaml(
+            r#"
+openapi: 3.0.0
+info:
+  title: API 1
+  version: 1.0.0
+paths:
+  /users:
+    get:
+      operationId: getUsers
+      responses:
+        '200':
+          description: OK
+"#,
+        );
+
+        let spec2 = create_test_spec_from_yaml(
+            r#"
+openapi: 3.0.0
+info:
+  title: API 2
+  version: 1.0.0
+paths:
+  /posts:
+    get:
+      operationId: getPosts
+      responses:
+        '200':
+          description: OK
+"#,
+        );
+
+        specs.insert("api1".to_string(), spec1);
+        specs.insert("api2".to_string(), spec2);
+
+        let result = merge_openapi_specs(&specs);
+        assert!(result.is_ok());
+
+        let merged = result.unwrap();
+        let paths = merged["paths"].as_object().unwrap();
+        assert_eq!(paths.len(), 2);
+        assert!(paths.contains_key("/users"));
+        assert!(paths.contains_key("/posts"));
+    }
+
+    #[test]
+    fn test_merge_openapi_specs_components() {
+        let mut specs = HashMap::new();
+
+        let spec1 = create_test_spec_from_yaml(
+            r#"
+openapi: 3.0.0
+info:
+  title: API 1
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+"#,
+        );
+
+        let spec2 = create_test_spec_from_yaml(
+            r#"
+openapi: 3.0.0
+info:
+  title: API 2
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    Post:
+      type: object
+      properties:
+        id:
+          type: string
+"#,
+        );
+
+        specs.insert("api1".to_string(), spec1);
+        specs.insert("api2".to_string(), spec2);
+
+        let result = merge_openapi_specs(&specs);
+        assert!(result.is_ok());
+
+        let merged = result.unwrap();
+        let components = merged["components"]["schemas"].as_object().unwrap();
+        assert_eq!(components.len(), 2);
+        assert!(components.contains_key("User"));
+        assert!(components.contains_key("Post"));
+    }
+
+    #[test]
+    fn test_merge_openapi_specs_tags_deduplication() {
+        let mut specs = HashMap::new();
+
+        let spec1 = create_test_spec_from_yaml(
+            r#"
+openapi: 3.0.0
+info:
+  title: API 1
+  version: 1.0.0
+paths: {}
+tags:
+  - name: users
+    description: User operations
+  - name: common
+    description: Common operations
+"#,
+        );
+
+        let spec2 = create_test_spec_from_yaml(
+            r#"
+openapi: 3.0.0
+info:
+  title: API 2
+  version: 1.0.0
+paths: {}
+tags:
+  - name: posts
+    description: Post operations
+  - name: common
+    description: Common operations
+"#,
+        );
+
+        specs.insert("api1".to_string(), spec1);
+        specs.insert("api2".to_string(), spec2);
+
+        let result = merge_openapi_specs(&specs);
+        assert!(result.is_ok());
+
+        let merged = result.unwrap();
+        let tags = merged["tags"].as_array().unwrap();
+        assert_eq!(tags.len(), 3); // users, common, posts (common not duplicated)
+
+        let tag_names: Vec<&str> = tags.iter().filter_map(|t| t["name"].as_str()).collect();
+
+        assert!(tag_names.contains(&"users"));
+        assert!(tag_names.contains(&"posts"));
+        assert!(tag_names.contains(&"common"));
+
+        // Verify "common" appears only once
+        let common_count = tag_names.iter().filter(|&&name| name == "common").count();
+        assert_eq!(common_count, 1);
+    }
+
+    #[test]
+    fn test_merge_openapi_specs_multiple_components() {
+        let mut specs = HashMap::new();
+
+        let spec1 = create_test_spec_from_yaml(
+            r#"
+openapi: 3.0.0
+info:
+  title: API 1
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    User:
+      type: object
+  parameters:
+    userId:
+      name: userId
+      in: query
+      required: true
+      schema:
+        type: string
+"#,
+        );
+
+        let spec2 = create_test_spec_from_yaml(
+            r#"
+openapi: 3.0.0
+info:
+  title: API 2
+  version: 1.0.0
+paths: {}
+components:
+  schemas:
+    Post:
+      type: object
+"#,
+        );
+
+        specs.insert("api1".to_string(), spec1);
+        specs.insert("api2".to_string(), spec2);
+
+        let result = merge_openapi_specs(&specs);
+        assert!(result.is_ok());
+
+        let merged = result.unwrap();
+        let schemas = merged["components"]["schemas"].as_object().unwrap();
+        assert!(schemas.contains_key("User"));
+        assert!(schemas.contains_key("Post"));
+
+        let params = merged["components"]["parameters"].as_object().unwrap();
+        assert!(params.contains_key("userId"));
+    }
+
+    #[test]
+    fn test_merge_openapi_specs_deterministic_order() {
+        let mut specs = HashMap::new();
+
+        let spec1 = create_test_spec_from_yaml(
+            r#"
+openapi: 3.0.0
+info:
+  title: API 1
+  version: 1.0.0
+paths:
+  /a:
+    get:
+      responses:
+        '200':
+          description: OK
+"#,
+        );
+
+        let spec2 = create_test_spec_from_yaml(
+            r#"
+openapi: 3.0.0
+info:
+  title: API 2
+  version: 1.0.0
+paths:
+  /b:
+    get:
+      responses:
+        '200':
+          description: OK
+"#,
+        );
+
+        let spec3 = create_test_spec_from_yaml(
+            r#"
+openapi: 3.0.0
+info:
+  title: API 3
+  version: 1.0.0
+paths:
+  /c:
+    get:
+      responses:
+        '200':
+          description: OK
+"#,
+        );
+
+        specs.insert("api1".to_string(), spec1);
+        specs.insert("api2".to_string(), spec2);
+        specs.insert("api3".to_string(), spec3);
+
+        let result1 = merge_openapi_specs(&specs);
+        let result2 = merge_openapi_specs(&specs);
+
+        assert!(result1.is_ok());
+        assert!(result2.is_ok());
+
+        // Results should be identical (deterministic)
+        assert_eq!(
+            serde_json::to_string(&result1.unwrap()).unwrap(),
+            serde_json::to_string(&result2.unwrap()).unwrap()
+        );
+    }
+
+    // Helper function to create OpenAPI spec from YAML
+    fn create_test_spec_from_yaml(yaml: &str) -> OpenApiV3Spec {
+        serde_yaml::from_str(yaml).expect("Failed to parse OpenAPI YAML")
+    }
+}
