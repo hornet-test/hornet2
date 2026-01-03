@@ -24,6 +24,15 @@ interface EditorState {
   dataFlowSuggestions: DataFlowSuggestion[];
   dismissedSuggestions: Set<string>;
 
+  // OpenAPI spec (for API documentation)
+  openApiSpec: object | null;
+  isLoadingOpenApi: boolean;
+
+  // API Doc Drawer state
+  apiDocDrawerOpen: boolean;
+  apiDocDrawerWidth: number;
+  apiDocDrawerOperationId: string | null;
+
   // Workflow management
   workflows: WorkflowInfo[];
   currentWorkflowId: string | null;
@@ -66,6 +75,10 @@ interface EditorState {
     dataSource: DataSource,
     targetParam: { name: string; location: string },
   ) => void;
+  loadOpenApiSpec: (projectName: string) => Promise<void>;
+  openApiDocDrawer: (operationId: string) => void;
+  closeApiDocDrawer: () => void;
+  setApiDocDrawerWidth: (width: number) => void;
   reset: () => void;
 }
 
@@ -89,6 +102,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   isValid: true,
   dataFlowSuggestions: [],
   dismissedSuggestions: new Set(),
+  openApiSpec: null,
+  isLoadingOpenApi: false,
+  apiDocDrawerOpen: false,
+  apiDocDrawerWidth: 800,
+  apiDocDrawerOperationId: null,
   workflows: [],
   currentWorkflowId: null,
   isDirty: false,
@@ -117,6 +135,46 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         isLoading: false,
       });
     }
+  },
+
+  // Load OpenAPI spec from API (for Stoplight Elements)
+  loadOpenApiSpec: async (projectName: string) => {
+    set({ isLoadingOpenApi: true });
+    try {
+      const response = await fetch(`/api/projects/${encodeURIComponent(projectName)}/openapi`);
+      if (!response.ok) {
+        throw new Error(`Failed to load OpenAPI spec: ${response.statusText}`);
+      }
+      const spec = (await response.json()) as Record<string, unknown>;
+      set({ openApiSpec: spec, isLoadingOpenApi: false });
+    } catch (error) {
+      console.error('Failed to load OpenAPI spec:', error);
+      set({
+        openApiSpec: null,
+        isLoadingOpenApi: false,
+      });
+    }
+  },
+
+  // API Doc Drawer actions
+  openApiDocDrawer: (operationId: string) => {
+    const { operations } = get();
+    const operation = operations.find((op) => op.operation_id === operationId);
+
+    set({
+      apiDocDrawerOpen: true,
+      apiDocDrawerOperationId: operationId,
+      selectedOperation: operation || null,
+    });
+  },
+
+  closeApiDocDrawer: () => {
+    set({ apiDocDrawerOpen: false });
+  },
+
+  setApiDocDrawerWidth: (width: number) => {
+    const constrainedWidth = Math.max(400, Math.min(width, window.innerWidth * 0.9));
+    set({ apiDocDrawerWidth: constrainedWidth });
   },
 
   // Load workflows from API

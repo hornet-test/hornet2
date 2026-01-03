@@ -2,9 +2,10 @@ import type { SelectedNode } from '../types/graph';
 
 type DetailsPanelProps = {
   nodeData: SelectedNode | null;
+  onViewDocs?: (operationId: string) => void;
 };
 
-export function DetailsPanel({ nodeData }: DetailsPanelProps) {
+export function DetailsPanel({ nodeData, onViewDocs }: DetailsPanelProps) {
   const connectionCount = nodeData?.connectedEdges ?? 0;
 
   return (
@@ -58,9 +59,42 @@ export function DetailsPanel({ nodeData }: DetailsPanelProps) {
                 <div className="detail-value">{connectionCount} edge(s)</div>
               </div>
             )}
+
+            {nodeData.operation_id && onViewDocs && (
+              <button
+                className="view-docs-button"
+                onClick={() => onViewDocs(nodeData.operation_id!)}
+              >
+                📖 View API Documentation
+              </button>
+            )}
           </>
         )}
       </div>
+
+      <style>{getStyles()}</style>
     </div>
   );
+}
+
+function getStyles() {
+  return `
+    .view-docs-button {
+      width: 100%;
+      margin-top: 1rem;
+      padding: 0.75rem;
+      background: #0d6efd;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .view-docs-button:hover {
+      background: #0b5ed7;
+    }
+  `;
 }
