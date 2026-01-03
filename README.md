@@ -1,6 +1,8 @@
 # hornet2 (仮称)
 
-[![CI](https://github.com/hornet-test/hornet2/actions/workflows/rust.yml/badge.svg)](https://github.com/hornet-test/hornet2/actions/workflows/rust.yml)
+[![Rust CI](https://github.com/hornet-test/hornet2/actions/workflows/rust.yml/badge.svg)](https://github.com/hornet-test/hornet2/actions/workflows/rust.yml)
+[![JS CI](https://github.com/hornet-test/hornet2/actions/workflows/js.yml/badge.svg)](https://github.com/hornet-test/hornet2/actions/workflows/js.yml)
+[![codecov](https://codecov.io/gh/hornet-test/hornet2/graph/badge.svg?token=ZQGM9L3JNE)](https://codecov.io/gh/hornet-test/hornet2)
 
 **ドキュメント駆動型 API テストツール**
 
