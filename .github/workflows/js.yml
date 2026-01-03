@@ -33,3 +33,8 @@ jobs:
       run: pnpm run build
     - name: Test
       run: pnpm test -- --runInBand --watch=false
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v5
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        flags: js
