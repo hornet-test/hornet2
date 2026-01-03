@@ -7,10 +7,7 @@ interface ApiDocViewerProps {
   operationId: string;
 }
 
-export default function ApiDocViewer({
-  openApiSpec,
-  operationId,
-}: ApiDocViewerProps) {
+export default function ApiDocViewer({ openApiSpec, operationId }: ApiDocViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

@@ -100,11 +100,7 @@ export const ApiDocDrawer: React.FC<ApiDocDrawerProps> = ({ onClose }) => {
         {/* Header */}
         <div className="api-doc-drawer-header">
           <h3>API Documentation</h3>
-          <button
-            className="close-button"
-            onClick={handleClose}
-            aria-label="Close documentation"
-          >
+          <button className="close-button" onClick={handleClose} aria-label="Close documentation">
             ✕
           </button>
         </div>
@@ -117,10 +113,7 @@ export const ApiDocDrawer: React.FC<ApiDocDrawerProps> = ({ onClose }) => {
               <p>Loading OpenAPI specification...</p>
             </div>
           ) : openApiSpec && apiDocDrawerOperationId ? (
-            <ApiDocViewer
-              openApiSpec={openApiSpec}
-              operationId={apiDocDrawerOperationId}
-            />
+            <ApiDocViewer openApiSpec={openApiSpec} operationId={apiDocDrawerOperationId} />
           ) : (
             <div className="error-state">
               <p>{!openApiSpec ? 'OpenAPI specification not available' : 'Operation not found'}</p>
