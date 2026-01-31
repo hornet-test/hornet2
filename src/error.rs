@@ -37,6 +37,18 @@ pub enum HornetError {
 
     #[error("Invalid path: {0}")]
     InvalidPath(String),
+
+    #[error("Tracer error: {0}")]
+    TracerError(String),
+
+    #[error("Trace session not found: {0}")]
+    TraceSessionNotFound(String),
+
+    #[error("Storage error: {0}")]
+    StorageError(String),
+
+    #[error("Inference error: {0}")]
+    InferenceError(String),
 }
 
 pub type Result<T> = std::result::Result<T, HornetError>;

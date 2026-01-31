@@ -9,6 +9,7 @@ pub mod models;
 pub mod runner;
 pub mod server;
 pub mod telemetry;
+pub mod tracer;
 pub mod validation;
 
 pub use error::{HornetError, Result};
