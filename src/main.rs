@@ -1,7 +1,7 @@
 use clap::Parser;
 use hornet2::{
     Result,
-    cli::{Cli, Commands, ExportFormat},
+    cli::{Cli, Commands, ExportFormat, TraceCommands},
     commands,
 };
 
@@ -88,6 +88,86 @@ async fn main() -> Result<()> {
                 output.as_deref(),
             )?;
         }
+        Commands::Trace { command } => match command {
+            TraceCommands::Start {
+                name,
+                otlp_port,
+                store_path,
+            } => {
+                commands::execute_trace_start(commands::TraceStartArgs {
+                    name,
+                    otlp_port,
+                    store_path,
+                })
+                .await?;
+            }
+            TraceCommands::Stop { session } => {
+                commands::execute_trace_stop(commands::TraceStopArgs { session }).await?;
+            }
+            TraceCommands::List { active, format } => {
+                commands::execute_trace_list(commands::TraceListArgs { active, format }).await?;
+            }
+            TraceCommands::Show {
+                session_id,
+                spans,
+                limit,
+            } => {
+                commands::execute_trace_show(commands::TraceShowArgs {
+                    session_id,
+                    spans,
+                    limit,
+                })
+                .await?;
+            }
+            TraceCommands::ExportOpenapi {
+                session_id,
+                output,
+                format,
+                infer_params,
+                infer_schemas,
+            } => {
+                commands::execute_trace_export_openapi(commands::TraceExportOpenapiArgs {
+                    session_id,
+                    output,
+                    format,
+                    infer_params,
+                    infer_schemas,
+                })
+                .await?;
+            }
+            TraceCommands::ExportArazzo {
+                session_id,
+                output,
+                format,
+                workflow_name,
+            } => {
+                commands::execute_trace_export_arazzo(commands::TraceExportArazzoArgs {
+                    session_id,
+                    output,
+                    format,
+                    workflow_name,
+                })
+                .await?;
+            }
+            TraceCommands::ExportStubs {
+                session_id,
+                output_dir,
+                format,
+                host,
+            } => {
+                commands::execute_trace_export_stubs(commands::TraceExportStubsArgs {
+                    session_id,
+                    output_dir,
+                    format,
+                    host,
+                })
+                .await?;
+            }
+            TraceCommands::Delete { session_id, force } => {
+                commands::execute_trace_delete(commands::TraceDeleteArgs { session_id, force })
+                    .await?;
+            }
+        },
     }
 
     Ok(())

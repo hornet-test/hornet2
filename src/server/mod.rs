@@ -1,6 +1,7 @@
 pub mod api;
 pub mod lsp;
 pub mod state;
+pub mod trace_api;
 
 use axum::{Router, http::StatusCode, routing::get};
 use std::net::SocketAddr;
@@ -10,6 +11,7 @@ use tower_http::cors::CorsLayer;
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 
 use state::AppState;
+pub use trace_api::TraceState;
 
 /// Webサーバーを起動する（マルチプロジェクトモード）
 pub async fn start_server(addr: SocketAddr, root_dir: PathBuf) -> crate::Result<()> {
@@ -20,10 +22,14 @@ pub async fn start_server(addr: SocketAddr, root_dir: PathBuf) -> crate::Result<
     let _telemetry_guard = crate::telemetry::init_telemetry()?;
 
     // 共有状態を作成
-    let state = AppState::new(root_dir)?;
+    let state = AppState::new(root_dir.clone())?;
+
+    // トレース状態を作成（オプション）
+    let trace_store_path = root_dir.join(".hornet2/traces");
+    let trace_state = trace_api::TraceState::new(trace_store_path).ok();
 
     // ルーターを構築
-    let app = Router::new()
+    let mut app = Router::new()
         // Multi-Project API
         .route("/api/projects", get(api::list_projects))
         .route("/api/projects/{project_name}", get(api::get_project))
@@ -65,7 +71,23 @@ pub async fn start_server(addr: SocketAddr, root_dir: PathBuf) -> crate::Result<
         .route("/", get(serve_index))
         // SPAルーティングのフォールバック - 他のすべてのルートに対してindex.htmlを提供
         .fallback(serve_index)
-        .with_state(state)
+        .with_state(state);
+
+    // Add trace API if store was created successfully
+    if let Some(ts) = trace_state {
+        let trace_router = trace_api::trace_router(ts.clone());
+        // Also add the OTLP receiver endpoint
+        let otlp_router = ts.receiver.http_router();
+
+        app = app
+            .nest("/api/trace", trace_router)
+            .nest("/otlp", otlp_router);
+
+        tracing::info!("Trace API enabled at /api/trace");
+        tracing::info!("OTLP receiver enabled at /otlp/v1/traces");
+    }
+
+    let app = app
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(

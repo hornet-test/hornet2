@@ -143,6 +143,131 @@ pub enum Commands {
         #[arg(short = 'O', long)]
         output: Option<PathBuf>,
     },
+
+    /// Trace HTTP traffic to generate OpenAPI specs
+    Trace {
+        #[command(subcommand)]
+        command: TraceCommands,
+    },
+}
+
+/// Trace subcommands
+#[derive(Subcommand)]
+pub enum TraceCommands {
+    /// Start a new trace session
+    Start {
+        /// Session name
+        #[arg(short, long)]
+        name: Option<String>,
+
+        /// OTLP HTTP receiver port
+        #[arg(long, default_value = "4318")]
+        otlp_port: u16,
+
+        /// Storage path for trace data
+        #[arg(long)]
+        store_path: Option<PathBuf>,
+    },
+
+    /// Stop the active trace session
+    Stop {
+        /// Session ID to stop (defaults to active session)
+        #[arg(short, long)]
+        session: Option<String>,
+    },
+
+    /// List all trace sessions
+    List {
+        /// Show only active sessions
+        #[arg(long)]
+        active: bool,
+
+        /// Output format
+        #[arg(short, long, default_value = "table")]
+        format: TraceListFormat,
+    },
+
+    /// Show trace session details
+    Show {
+        /// Session ID
+        session_id: String,
+
+        /// Show spans
+        #[arg(long)]
+        spans: bool,
+
+        /// Limit number of spans shown
+        #[arg(long, default_value = "100")]
+        limit: u64,
+    },
+
+    /// Export trace data as OpenAPI specification
+    ExportOpenapi {
+        /// Session ID
+        session_id: String,
+
+        /// Output file (stdout if not specified)
+        #[arg(short = 'O', long)]
+        output: Option<PathBuf>,
+
+        /// Output format
+        #[arg(short, long, default_value = "yaml")]
+        format: ExportFormat,
+
+        /// Infer path parameters from observed paths
+        #[arg(long, default_value = "true")]
+        infer_params: bool,
+
+        /// Infer schema from observed bodies
+        #[arg(long, default_value = "true")]
+        infer_schemas: bool,
+    },
+
+    /// Export trace data as Arazzo workflow
+    ExportArazzo {
+        /// Session ID
+        session_id: String,
+
+        /// Output file (stdout if not specified)
+        #[arg(short = 'O', long)]
+        output: Option<PathBuf>,
+
+        /// Output format
+        #[arg(short, long, default_value = "yaml")]
+        format: ExportFormat,
+
+        /// Workflow name
+        #[arg(long)]
+        workflow_name: Option<String>,
+    },
+
+    /// Generate dependency API stubs
+    ExportStubs {
+        /// Session ID
+        session_id: String,
+
+        /// Output directory
+        #[arg(short = 'O', long)]
+        output_dir: PathBuf,
+
+        /// Stub format (wiremock, prism, native)
+        #[arg(long, default_value = "wiremock")]
+        format: StubFormat,
+
+        /// Host filter (only generate stubs for matching hosts)
+        #[arg(long)]
+        host: Option<String>,
+    },
+
+    /// Delete a trace session
+    Delete {
+        /// Session ID
+        session_id: String,
+
+        /// Force delete without confirmation
+        #[arg(short, long)]
+        force: bool,
+    },
 }
 
 #[derive(Clone, ValueEnum)]
@@ -161,4 +286,22 @@ pub enum ExportFormat {
     Yaml,
     /// JSON format
     Json,
+}
+
+#[derive(Clone, ValueEnum)]
+pub enum TraceListFormat {
+    /// Table format
+    Table,
+    /// JSON format
+    Json,
+}
+
+#[derive(Clone, ValueEnum)]
+pub enum StubFormat {
+    /// WireMock JSON mappings
+    Wiremock,
+    /// Prism mock server (OpenAPI with examples)
+    Prism,
+    /// Hornet2 native stub format
+    Native,
 }
