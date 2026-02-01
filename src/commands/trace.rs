@@ -3,7 +3,14 @@
 //! Commands for HTTP traffic tracing, OpenAPI inference, and stub generation.
 
 use crate::cli::{ExportFormat, StubFormat, TraceListFormat};
-use crate::tracer::{OtlpReceiver, TraceStore, TracerConfig};
+use crate::tracer::{
+    generators::{
+        arazzo_generator::ArazzoGeneratorConfig, stub_generator::StubGeneratorConfig,
+        ArazzoGenerator, StubGenerator,
+    },
+    inference::{openapi_generator::GeneratorConfig, OpenApiGenerator},
+    OtlpReceiver, SpanDirection, TraceStore, TracerConfig,
+};
 use crate::Result;
 use colored::*;
 use std::path::PathBuf;
@@ -413,15 +420,45 @@ pub async fn execute_trace_export_openapi(args: TraceExportOpenapiArgs) -> Resul
     // Get all spans
     let spans = store.get_spans(&args.session_id, 0, u64::MAX).await?;
 
-    // TODO: Implement OpenAPI generation from spans
-    // This will be implemented in the inference module
+    if spans.is_empty() {
+        println!("{}", "No spans found in session".yellow());
+        return Ok(());
+    }
 
-    println!();
-    println!(
-        "{}",
-        "OpenAPI export is not yet implemented. Coming soon!".yellow()
-    );
-    println!("  Total spans to process: {}", spans.len());
+    println!("  Processing {} spans...", spans.len());
+
+    // Generate OpenAPI spec
+    let generator = OpenApiGenerator::new()
+        .with_title("Generated API")
+        .with_version("1.0.0");
+
+    let config = GeneratorConfig {
+        infer_params: args.infer_params,
+        infer_schemas: args.infer_schemas,
+        include_examples: true,
+        direction_filter: Some(SpanDirection::Incoming),
+    };
+
+    let spec = generator.generate(&spans, &config);
+
+    // Output
+    let output = match args.format {
+        ExportFormat::Yaml => serde_yaml::to_string(&spec)
+            .map_err(|e| crate::HornetError::InferenceError(e.to_string()))?,
+        ExportFormat::Json => serde_json::to_string_pretty(&spec)?,
+    };
+
+    if let Some(output_path) = args.output {
+        std::fs::write(&output_path, &output)?;
+        println!();
+        println!(
+            "{}",
+            format!("✓ OpenAPI specification written to {}", output_path.display()).green()
+        );
+    } else {
+        println!();
+        println!("{}", output);
+    }
 
     Ok(())
 }
@@ -447,24 +484,58 @@ pub async fn execute_trace_export_arazzo(args: TraceExportArazzoArgs) -> Result<
         return Ok(());
     }
 
+    let workflow_name = args
+        .workflow_name
+        .clone()
+        .unwrap_or_else(|| "generated-workflow".to_string());
+
     println!("{}", "Generating Arazzo workflow...".bright_blue());
     println!("  Session: {}", args.session_id);
-    if let Some(name) = &args.workflow_name {
-        println!("  Workflow name: {}", name);
-    }
+    println!("  Workflow name: {}", workflow_name);
 
     // Get all spans
     let spans = store.get_spans(&args.session_id, 0, u64::MAX).await?;
 
-    // TODO: Implement Arazzo generation from spans
-    // This will be implemented in the generator module
+    if spans.is_empty() {
+        println!("{}", "No spans found in session".yellow());
+        return Ok(());
+    }
 
-    println!();
-    println!(
-        "{}",
-        "Arazzo export is not yet implemented. Coming soon!".yellow()
-    );
-    println!("  Total spans to process: {}", spans.len());
+    println!("  Processing {} spans...", spans.len());
+
+    // Generate Arazzo spec
+    let generator = ArazzoGenerator::new()
+        .with_workflow_name(&workflow_name)
+        .with_description("Auto-generated from trace data");
+
+    let config = ArazzoGeneratorConfig {
+        include_success_criteria: true,
+        include_request_bodies: true,
+        include_outputs: true,
+        group_by_trace: false,
+        direction_filter: Some(SpanDirection::Incoming),
+    };
+
+    let arazzo = generator.generate(&spans, &config);
+
+    // Output
+    let output = match args.format {
+        ExportFormat::Yaml => serde_yaml::to_string(&arazzo)
+            .map_err(|e| crate::HornetError::InferenceError(e.to_string()))?,
+        ExportFormat::Json => serde_json::to_string_pretty(&arazzo)?,
+    };
+
+    if let Some(output_path) = args.output {
+        std::fs::write(&output_path, &output)?;
+        println!();
+        println!(
+            "{}",
+            format!("✓ Arazzo workflow written to {}", output_path.display()).green()
+        );
+    } else {
+        println!();
+        println!("{}", output);
+    }
 
     Ok(())
 }
@@ -490,6 +561,12 @@ pub async fn execute_trace_export_stubs(args: TraceExportStubsArgs) -> Result<()
         return Ok(());
     }
 
+    let stub_format = match args.format {
+        StubFormat::Wiremock => crate::tracer::StubFormat::WireMock,
+        StubFormat::Prism => crate::tracer::StubFormat::Prism,
+        StubFormat::Native => crate::tracer::StubFormat::Native,
+    };
+
     println!("{}", "Generating dependency stubs...".bright_blue());
     println!("  Session: {}", args.session_id);
     println!("  Output directory: {}", args.output_dir.display());
@@ -505,8 +582,21 @@ pub async fn execute_trace_export_stubs(args: TraceExportStubsArgs) -> Result<()
         println!("  Host filter: {}", host);
     }
 
-    // Get dependencies
+    // Get all spans
+    let spans = store.get_spans(&args.session_id, 0, u64::MAX).await?;
+
+    if spans.is_empty() {
+        println!("{}", "No spans found in session".yellow());
+        return Ok(());
+    }
+
+    // Get dependencies summary
     let dependencies = store.get_dependencies(&args.session_id).await?;
+
+    if dependencies.is_empty() {
+        println!("{}", "No outgoing dependencies found".yellow());
+        return Ok(());
+    }
 
     println!();
     println!("{}", "Dependencies found:".bright_cyan());
@@ -514,14 +604,30 @@ pub async fn execute_trace_export_stubs(args: TraceExportStubsArgs) -> Result<()
         println!("  {}:{} ({} calls)", host, port, count);
     }
 
-    // TODO: Implement stub generation
-    // This will be implemented in the generator module
+    // Generate stubs
+    let generator = StubGenerator::new(stub_format);
+    let config = StubGeneratorConfig {
+        host_filter: args.host.clone(),
+        include_request_matchers: true,
+        include_headers: true,
+        include_error_responses: true,
+    };
+
+    let stubs = generator.generate(&spans, &config);
+
+    if stubs.is_empty() {
+        println!("{}", "No stubs generated (no matching outgoing spans)".yellow());
+        return Ok(());
+    }
+
+    // Write to files
+    let files = generator.write_to_directory(&stubs, &args.output_dir)?;
 
     println!();
-    println!(
-        "{}",
-        "Stub export is not yet implemented. Coming soon!".yellow()
-    );
+    println!("{}", "✓ Stubs generated:".green());
+    for file in files {
+        println!("  {}", file.display());
+    }
 
     Ok(())
 }
