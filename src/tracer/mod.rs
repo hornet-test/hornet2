@@ -19,7 +19,7 @@ pub mod store;
 pub mod types;
 
 pub use config::TracerConfig;
-pub use generators::{ArazzoGenerator, StubGenerator, StubFormat};
+pub use generators::{ArazzoGenerator, StubFormat, StubGenerator};
 pub use inference::{OpenApiGenerator, PathAnalyzer, SchemaInferrer};
 pub use otlp_receiver::OtlpReceiver;
 pub use span_classifier::SpanClassifier;

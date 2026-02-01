@@ -2,8 +2,8 @@
 //!
 //! Primarily used for testing and development.
 
-use crate::tracer::types::{HttpSpan, SpanDirection, TraceSession, TraceStatistics};
 use crate::Result;
+use crate::tracer::types::{HttpSpan, SpanDirection, TraceSession, TraceStatistics};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 

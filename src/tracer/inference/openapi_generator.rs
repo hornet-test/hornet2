@@ -113,9 +113,9 @@ impl OpenApiGenerator {
         self.build_openapi_spec(&endpoints, config)
     }
 
-    fn group_by_endpoint<'a>(
+    fn group_by_endpoint(
         &self,
-        spans: &[&'a HttpSpan],
+        spans: &[&HttpSpan],
         config: &GeneratorConfig,
     ) -> Vec<EndpointData> {
         // First, analyze paths to detect parameters
@@ -204,21 +204,21 @@ impl OpenApiGenerator {
             }
 
             // Add request body
-            if let Some(body) = &span.request_body {
-                if let BodyData::Json(json) = &body.data {
-                    entry.request_bodies.push(json.clone());
-                }
+            if let Some(body) = &span.request_body
+                && let BodyData::Json(json) = &body.data
+            {
+                entry.request_bodies.push(json.clone());
             }
 
             // Add response body
-            if let Some(body) = &span.response_body {
-                if let BodyData::Json(json) = &body.data {
-                    entry
-                        .responses
-                        .entry(span.status_code)
-                        .or_default()
-                        .push(json.clone());
-                }
+            if let Some(body) = &span.response_body
+                && let BodyData::Json(json) = &body.data
+            {
+                entry
+                    .responses
+                    .entry(span.status_code)
+                    .or_default()
+                    .push(json.clone());
             }
 
             entry.spans.push((*span).clone());
@@ -259,7 +259,10 @@ impl OpenApiGenerator {
             return false;
         }
 
-        let route_segments: Vec<&str> = route_parts[1].split('/').filter(|s| !s.is_empty()).collect();
+        let route_segments: Vec<&str> = route_parts[1]
+            .split('/')
+            .filter(|s| !s.is_empty())
+            .collect();
         let path_segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
 
         if route_segments.len() != path_segments.len() {
@@ -359,10 +362,7 @@ impl OpenApiGenerator {
                 json_content.insert("example".to_string(), schema.examples[0].clone());
             }
 
-            content.insert(
-                "application/json".to_string(),
-                Value::Object(json_content),
-            );
+            content.insert("application/json".to_string(), Value::Object(json_content));
 
             operation.insert(
                 "requestBody".to_string(),
@@ -457,10 +457,7 @@ impl OpenApiGenerator {
         // Convert route to operation ID
         // e.g., "GET /users/{id}" -> "getUsersById"
 
-        let route_parts: Vec<&str> = route
-            .split('/')
-            .filter(|s| !s.is_empty())
-            .collect();
+        let route_parts: Vec<&str> = route.split('/').filter(|s| !s.is_empty()).collect();
 
         let mut parts = vec![method.to_lowercase()];
 
@@ -597,10 +594,7 @@ mod tests {
     fn test_operation_id_generation() {
         let generator = OpenApiGenerator::new();
 
-        assert_eq!(
-            generator.generate_operation_id("GET", "/users"),
-            "getUsers"
-        );
+        assert_eq!(generator.generate_operation_id("GET", "/users"), "getUsers");
         assert_eq!(
             generator.generate_operation_id("GET", "/users/{id}"),
             "getUsersById"

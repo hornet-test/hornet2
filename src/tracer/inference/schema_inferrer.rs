@@ -126,12 +126,12 @@ impl SchemaInferrer {
         }
 
         // Date-time (ISO 8601)
-        if value.len() >= 10 && (value.contains('T') || value.contains(' ')) {
-            if value.chars().take(4).all(|c| c.is_ascii_digit())
-                && value.chars().nth(4) == Some('-')
-            {
-                return Some("date-time".to_string());
-            }
+        if value.len() >= 10
+            && (value.contains('T') || value.contains(' '))
+            && value.chars().take(4).all(|c| c.is_ascii_digit())
+            && value.chars().nth(4) == Some('-')
+        {
+            return Some("date-time".to_string());
         }
 
         // Date only
@@ -294,12 +294,8 @@ impl SchemaInferrer {
         if !required.is_empty() {
             let mut sorted_required = required;
             sorted_required.sort();
-            result["required"] = Value::Array(
-                sorted_required
-                    .into_iter()
-                    .map(Value::String)
-                    .collect(),
-            );
+            result["required"] =
+                Value::Array(sorted_required.into_iter().map(Value::String).collect());
         }
 
         result

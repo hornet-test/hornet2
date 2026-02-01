@@ -3,18 +3,18 @@
 //! Supports both gRPC and HTTP protocols for receiving traces from
 //! OBI (OpenTelemetry eBPF Instrumentation) and other OTLP exporters.
 
+use super::TracerConfig;
 use super::span_classifier::SpanClassifier;
 use super::store::TraceStore;
 use super::types::{SpanDirection, TraceSession, TraceStatistics};
-use super::TracerConfig;
 use crate::Result;
 use axum::{
+    Router,
     body::Bytes,
     extract::State,
-    http::{header, StatusCode},
+    http::{StatusCode, header},
     response::IntoResponse,
     routing::post,
-    Router,
 };
 use chrono::Utc;
 use opentelemetry_proto::tonic::collector::trace::v1::{
@@ -57,10 +57,9 @@ pub struct OtlpReceiver {
 impl OtlpReceiver {
     /// Create a new OTLP receiver
     pub fn new(store: Arc<TraceStore>, config: TracerConfig) -> Self {
-        let classifier = Arc::new(SpanClassifier::new().with_body_capture(
-            config.capture_bodies,
-            config.max_body_size,
-        ));
+        let classifier = Arc::new(
+            SpanClassifier::new().with_body_capture(config.capture_bodies, config.max_body_size),
+        );
 
         Self {
             state: Arc::new(OtlpReceiverState {
@@ -398,7 +397,10 @@ mod tests {
         let receiver = OtlpReceiver::new(store, config);
 
         // Start session
-        let session_id = receiver.start_session(Some("Test".to_string())).await.unwrap();
+        let session_id = receiver
+            .start_session(Some("Test".to_string()))
+            .await
+            .unwrap();
         assert!(receiver.active_session_id().is_some());
 
         // Stop session

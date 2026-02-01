@@ -87,12 +87,10 @@ impl PathAnalyzer {
                 name: "uuid".to_string(),
                 matcher: |s| {
                     s.len() == 36
-                        && s.chars()
-                            .enumerate()
-                            .all(|(i, c)| match i {
-                                8 | 13 | 18 | 23 => c == '-',
-                                _ => c.is_ascii_hexdigit(),
-                            })
+                        && s.chars().enumerate().all(|(i, c)| match i {
+                            8 | 13 | 18 | 23 => c == '-',
+                            _ => c.is_ascii_hexdigit(),
+                        })
                 },
             },
             KnownPattern {
@@ -197,8 +195,7 @@ impl PathAnalyzer {
                 .collect();
 
             let route = format!("/{}", route_segments.join("/"));
-            let parameters: Vec<PathParameter> =
-                param_positions.into_iter().flatten().collect();
+            let parameters: Vec<PathParameter> = param_positions.into_iter().flatten().collect();
 
             results.push(PathAnalysisResult {
                 route,
@@ -368,8 +365,14 @@ mod tests {
     fn test_detect_uuid_parameter() {
         let analyzer = PathAnalyzer::new();
         let paths = vec![
-            ("GET".to_string(), "/users/550e8400-e29b-41d4-a716-446655440000".to_string()),
-            ("GET".to_string(), "/users/6ba7b810-9dad-11d1-80b4-00c04fd430c8".to_string()),
+            (
+                "GET".to_string(),
+                "/users/550e8400-e29b-41d4-a716-446655440000".to_string(),
+            ),
+            (
+                "GET".to_string(),
+                "/users/6ba7b810-9dad-11d1-80b4-00c04fd430c8".to_string(),
+            ),
         ];
 
         let results = analyzer.analyze(&paths);

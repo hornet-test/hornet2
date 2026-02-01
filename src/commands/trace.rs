@@ -2,16 +2,16 @@
 //!
 //! Commands for HTTP traffic tracing, OpenAPI inference, and stub generation.
 
+use crate::Result;
 use crate::cli::{ExportFormat, StubFormat, TraceListFormat};
 use crate::tracer::{
-    generators::{
-        arazzo_generator::ArazzoGeneratorConfig, stub_generator::StubGeneratorConfig,
-        ArazzoGenerator, StubGenerator,
-    },
-    inference::{openapi_generator::GeneratorConfig, OpenApiGenerator},
     OtlpReceiver, SpanDirection, TraceStore, TracerConfig,
+    generators::{
+        ArazzoGenerator, StubGenerator, arazzo_generator::ArazzoGeneratorConfig,
+        stub_generator::StubGeneratorConfig,
+    },
+    inference::{OpenApiGenerator, openapi_generator::GeneratorConfig},
 };
-use crate::Result;
 use colored::*;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -104,10 +104,7 @@ pub async fn execute_trace_start(args: TraceStartArgs) -> Result<()> {
     }
     println!();
     println!("{}", "OTLP Endpoint:".bright_cyan());
-    println!(
-        "  HTTP: http://localhost:{}/v1/traces",
-        args.otlp_port
-    );
+    println!("  HTTP: http://localhost:{}/v1/traces", args.otlp_port);
     println!();
     println!("Configure your application with:");
     println!(
@@ -173,10 +170,7 @@ pub async fn execute_trace_stop(args: TraceStopArgs) -> Result<()> {
             store.update_session(&session).await?;
             println!("{}", format!("✓ Stopped session: {}", session_id).green());
         } else {
-            println!(
-                "{}",
-                format!("Session not found: {}", session_id).yellow()
-            );
+            println!("{}", format!("Session not found: {}", session_id).yellow());
         }
     } else {
         println!(
@@ -201,7 +195,10 @@ pub async fn execute_trace_list(args: TraceListArgs) -> Result<()> {
     let sessions = store.list_sessions().await?;
 
     let sessions: Vec<_> = if args.active {
-        sessions.into_iter().filter(|s| s.ended_at.is_none()).collect()
+        sessions
+            .into_iter()
+            .filter(|s| s.ended_at.is_none())
+            .collect()
     } else {
         sessions
     };
@@ -216,10 +213,7 @@ pub async fn execute_trace_list(args: TraceListArgs) -> Result<()> {
                 return Ok(());
             }
 
-            println!(
-                "{}",
-                format!("Trace Sessions ({}):", sessions.len()).bold()
-            );
+            println!("{}", format!("Trace Sessions ({}):", sessions.len()).bold());
             println!();
 
             for session in sessions {
@@ -229,17 +223,16 @@ pub async fn execute_trace_list(args: TraceListArgs) -> Result<()> {
                     "active".green()
                 };
 
-                println!(
-                    "  {} [{}]",
-                    session.id.cyan(),
-                    status
-                );
+                println!("  {} [{}]", session.id.cyan(), status);
 
                 if let Some(name) = &session.name {
                     println!("    Name: {}", name);
                 }
 
-                println!("    Started: {}", session.started_at.format("%Y-%m-%d %H:%M:%S"));
+                println!(
+                    "    Started: {}",
+                    session.started_at.format("%Y-%m-%d %H:%M:%S")
+                );
 
                 if let Some(ended) = session.ended_at {
                     println!("    Ended: {}", ended.format("%Y-%m-%d %H:%M:%S"));
@@ -364,7 +357,10 @@ pub async fn execute_trace_show(args: TraceShowArgs) -> Result<()> {
             let spans = store.get_spans(&args.session_id, 0, args.limit).await?;
             if !spans.is_empty() {
                 println!();
-                println!("{}", format!("Spans (showing {} of total)", spans.len()).bold());
+                println!(
+                    "{}",
+                    format!("Spans (showing {} of total)", spans.len()).bold()
+                );
                 for span in spans {
                     let direction = match span.direction {
                         crate::tracer::types::SpanDirection::Incoming => "→".green(),
@@ -453,7 +449,11 @@ pub async fn execute_trace_export_openapi(args: TraceExportOpenapiArgs) -> Resul
         println!();
         println!(
             "{}",
-            format!("✓ OpenAPI specification written to {}", output_path.display()).green()
+            format!(
+                "✓ OpenAPI specification written to {}",
+                output_path.display()
+            )
+            .green()
         );
     } else {
         println!();
@@ -616,7 +616,10 @@ pub async fn execute_trace_export_stubs(args: TraceExportStubsArgs) -> Result<()
     let stubs = generator.generate(&spans, &config);
 
     if stubs.is_empty() {
-        println!("{}", "No stubs generated (no matching outgoing spans)".yellow());
+        println!(
+            "{}",
+            "No stubs generated (no matching outgoing spans)".yellow()
+        );
         return Ok(());
     }
 
@@ -654,10 +657,7 @@ pub async fn execute_trace_delete(args: TraceDeleteArgs) -> Result<()> {
             }
             println!("  Spans: {}", session.statistics.total_spans);
             println!();
-            println!(
-                "{}",
-                "Use --force to confirm deletion".bright_black()
-            );
+            println!("{}", "Use --force to confirm deletion".bright_black());
             return Ok(());
         }
 

@@ -200,12 +200,7 @@ impl AttributeExtractor {
                 serde_json::Value::Bool(*b)
             }
             Some(opentelemetry_proto::tonic::common::v1::any_value::Value::ArrayValue(arr)) => {
-                serde_json::Value::Array(
-                    arr.values
-                        .iter()
-                        .map(Self::any_value_to_json)
-                        .collect(),
-                )
+                serde_json::Value::Array(arr.values.iter().map(Self::any_value_to_json).collect())
             }
             Some(opentelemetry_proto::tonic::common::v1::any_value::Value::KvlistValue(kv)) => {
                 let map: serde_json::Map<String, serde_json::Value> = kv

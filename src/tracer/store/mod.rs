@@ -144,11 +144,7 @@ impl TraceStore {
     }
 
     /// Update statistics
-    pub async fn update_statistics(
-        &self,
-        session_id: &str,
-        stats: &TraceStatistics,
-    ) -> Result<()> {
+    pub async fn update_statistics(&self, session_id: &str, stats: &TraceStatistics) -> Result<()> {
         match &self.backend {
             StoreBackend::Memory(store) => store.update_statistics(session_id, stats).await,
             StoreBackend::Sqlite(store) => store.update_statistics(session_id, stats).await,

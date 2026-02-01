@@ -240,9 +240,7 @@ impl StubGenerator {
             let id = format!(
                 "{}-{}-{}",
                 span.method.to_lowercase(),
-                span.path
-                    .replace('/', "-")
-                    .trim_start_matches('-'),
+                span.path.replace('/', "-").trim_start_matches('-'),
                 i
             );
 
@@ -374,12 +372,10 @@ impl StubGenerator {
                 let responses: Vec<NativeResponse> = endpoint_spans
                     .into_iter()
                     .map(|span| {
-                        let body = span.response_body.as_ref().and_then(|b| {
-                            match &b.data {
-                                BodyData::Json(json) => Some(json.clone()),
-                                BodyData::Text(text) => Some(Value::String(text.clone())),
-                                _ => None,
-                            }
+                        let body = span.response_body.as_ref().and_then(|b| match &b.data {
+                            BodyData::Json(json) => Some(json.clone()),
+                            BodyData::Text(text) => Some(Value::String(text.clone())),
+                            _ => None,
                         });
 
                         let headers = if config.include_headers && !span.response_headers.is_empty()
@@ -390,9 +386,10 @@ impl StubGenerator {
                         };
 
                         let when = if config.include_request_matchers {
-                            let query = span.query.as_ref().map(|q| {
-                                Self::parse_query(q).into_iter().collect()
-                            });
+                            let query = span
+                                .query
+                                .as_ref()
+                                .map(|q| Self::parse_query(q).into_iter().collect());
 
                             if query.is_some() {
                                 Some(NativeRequestMatcher {
@@ -473,17 +470,15 @@ impl StubGenerator {
                 }
                 StubOutput::Prism(openapi) => {
                     let path = dir.join(format!("{}_openapi.yaml", filename));
-                    let content = serde_yaml::to_string(openapi).map_err(|e| {
-                        std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
-                    })?;
+                    let content = serde_yaml::to_string(openapi)
+                        .map_err(|e| std::io::Error::other(e.to_string()))?;
                     std::fs::write(&path, content)?;
                     files.push(path);
                 }
                 StubOutput::Native(native) => {
                     let path = dir.join(format!("{}_stub.yaml", filename));
-                    let content = serde_yaml::to_string(native).map_err(|e| {
-                        std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
-                    })?;
+                    let content = serde_yaml::to_string(native)
+                        .map_err(|e| std::io::Error::other(e.to_string()))?;
                     std::fs::write(&path, content)?;
                     files.push(path);
                 }

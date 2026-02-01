@@ -3,7 +3,7 @@
 use crate::tracer::types::{HttpSpan, SpanDirection, TraceSession, TraceStatistics};
 use crate::{HornetError, Result};
 use parking_lot::Mutex;
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, params};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -207,8 +207,11 @@ impl SqliteStore {
         let conn = self.conn.lock();
 
         // Delete spans first (foreign key)
-        conn.execute("DELETE FROM spans WHERE session_id = ?1", params![session_id])
-            .map_err(|e| HornetError::StorageError(format!("Failed to delete spans: {}", e)))?;
+        conn.execute(
+            "DELETE FROM spans WHERE session_id = ?1",
+            params![session_id],
+        )
+        .map_err(|e| HornetError::StorageError(format!("Failed to delete spans: {}", e)))?;
 
         conn.execute("DELETE FROM sessions WHERE id = ?1", params![session_id])
             .map_err(|e| HornetError::StorageError(format!("Failed to delete session: {}", e)))?;
@@ -440,13 +443,11 @@ fn insert_span(conn: &Connection, session_id: &str, span: &HttpSpan) -> Result<(
     let request_body_json = span
         .request_body
         .as_ref()
-        .map(|b| serde_json::to_string(b).ok())
-        .flatten();
+        .and_then(|b| serde_json::to_string(b).ok());
     let response_body_json = span
         .response_body
         .as_ref()
-        .map(|b| serde_json::to_string(b).ok())
-        .flatten();
+        .and_then(|b| serde_json::to_string(b).ok());
     let request_headers_json =
         serde_json::to_string(&span.request_headers).unwrap_or_else(|_| "{}".to_string());
     let response_headers_json =
@@ -524,21 +525,13 @@ fn row_to_span(row: &rusqlite::Row) -> rusqlite::Result<Result<HttpSpan>> {
     let start_time = DateTime::parse_from_rfc3339(&start_time_str)
         .map(|dt| dt.with_timezone(&chrono::Utc))
         .map_err(|e| {
-            rusqlite::Error::FromSqlConversionFailure(
-                3,
-                rusqlite::types::Type::Text,
-                Box::new(e),
-            )
+            rusqlite::Error::FromSqlConversionFailure(3, rusqlite::types::Type::Text, Box::new(e))
         })?;
 
     let end_time = DateTime::parse_from_rfc3339(&end_time_str)
         .map(|dt| dt.with_timezone(&chrono::Utc))
         .map_err(|e| {
-            rusqlite::Error::FromSqlConversionFailure(
-                4,
-                rusqlite::types::Type::Text,
-                Box::new(e),
-            )
+            rusqlite::Error::FromSqlConversionFailure(4, rusqlite::types::Type::Text, Box::new(e))
         })?;
 
     let direction = match direction_str.as_str() {

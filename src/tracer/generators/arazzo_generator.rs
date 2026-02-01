@@ -239,17 +239,16 @@ impl ArazzoGenerator {
             // Generate outputs
             let outputs = if config.include_outputs && span.response_body.is_some() {
                 let mut output_map = serde_json::Map::new();
-                if let Some(body) = &span.response_body {
-                    if let BodyData::Json(json) = &body.data {
-                        // Extract top-level fields as outputs
-                        if let Some(obj) = json.as_object() {
-                            for key in obj.keys().take(5) {
-                                output_map.insert(
-                                    key.clone(),
-                                    serde_json::json!(format!("$response.body.{}", key)),
-                                );
-                            }
-                        }
+                if let Some(body) = &span.response_body
+                    && let BodyData::Json(json) = &body.data
+                    && let Some(obj) = json.as_object()
+                {
+                    // Extract top-level fields as outputs
+                    for key in obj.keys().take(5) {
+                        output_map.insert(
+                            key.clone(),
+                            serde_json::json!(format!("$response.body.{}", key)),
+                        );
                     }
                 }
                 if output_map.is_empty() {
@@ -302,8 +301,7 @@ impl ArazzoGenerator {
         let clean_path = path
             .trim_start_matches('/')
             .replace('/', "-")
-            .replace('{', "")
-            .replace('}', "")
+            .replace(['{', '}'], "")
             .to_lowercase();
 
         format!("{}-{}", method.to_lowercase(), clean_path)
@@ -338,7 +336,7 @@ impl ArazzoGenerator {
             infer_params: true,
             infer_schemas: true,
             include_examples: true,
-            direction_filter: config.direction_filter.clone(),
+            direction_filter: config.direction_filter,
         };
 
         let openapi = openapi_generator.generate(spans, &openapi_config);

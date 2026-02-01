@@ -197,7 +197,10 @@ pub enum BodyData {
 impl BodyData {
     /// Check if body data is available
     pub fn is_available(&self) -> bool {
-        matches!(self, BodyData::Json(_) | BodyData::Text(_) | BodyData::Binary(_))
+        matches!(
+            self,
+            BodyData::Json(_) | BodyData::Text(_) | BodyData::Binary(_)
+        )
     }
 }
 

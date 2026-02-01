@@ -67,42 +67,42 @@ impl TracerConfig {
     pub fn from_env() -> Self {
         let mut config = Self::default();
 
-        if let Ok(port) = std::env::var("HORNET2_OTLP_GRPC_PORT") {
-            if let Ok(p) = port.parse() {
-                config.grpc_port = p;
-            }
+        if let Ok(port) = std::env::var("HORNET2_OTLP_GRPC_PORT")
+            && let Ok(p) = port.parse()
+        {
+            config.grpc_port = p;
         }
 
-        if let Ok(port) = std::env::var("HORNET2_OTLP_HTTP_PORT") {
-            if let Ok(p) = port.parse() {
-                config.http_port = p;
-            }
+        if let Ok(port) = std::env::var("HORNET2_OTLP_HTTP_PORT")
+            && let Ok(p) = port.parse()
+        {
+            config.http_port = p;
         }
 
         if let Ok(path) = std::env::var("HORNET2_TRACE_STORE_PATH") {
             config.store_path = PathBuf::from(path);
         }
 
-        if let Ok(timeout) = std::env::var("HORNET2_SESSION_TIMEOUT_SECS") {
-            if let Ok(t) = timeout.parse() {
-                config.session_timeout = Duration::from_secs(t);
-            }
+        if let Ok(timeout) = std::env::var("HORNET2_SESSION_TIMEOUT_SECS")
+            && let Ok(t) = timeout.parse()
+        {
+            config.session_timeout = Duration::from_secs(t);
         }
 
-        if let Ok(max_spans) = std::env::var("HORNET2_MAX_MEMORY_SPANS") {
-            if let Ok(m) = max_spans.parse() {
-                config.max_memory_spans = m;
-            }
+        if let Ok(max_spans) = std::env::var("HORNET2_MAX_MEMORY_SPANS")
+            && let Ok(m) = max_spans.parse()
+        {
+            config.max_memory_spans = m;
         }
 
         if let Ok(capture) = std::env::var("HORNET2_CAPTURE_BODIES") {
             config.capture_bodies = capture.to_lowercase() == "true" || capture == "1";
         }
 
-        if let Ok(max_size) = std::env::var("HORNET2_MAX_BODY_SIZE") {
-            if let Ok(s) = max_size.parse() {
-                config.max_body_size = s;
-            }
+        if let Ok(max_size) = std::env::var("HORNET2_MAX_BODY_SIZE")
+            && let Ok(s) = max_size.parse()
+        {
+            config.max_body_size = s;
         }
 
         config

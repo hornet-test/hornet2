@@ -1,6 +1,6 @@
 //! Span classification logic for determining incoming vs outgoing requests.
 
-use super::semantic_conventions::{self as semconv, span_kind, AttributeExtractor};
+use super::semantic_conventions::{self as semconv, AttributeExtractor, span_kind};
 use super::types::{BodyData, CapturedBody, HttpSpan, SpanDirection};
 use chrono::{DateTime, TimeZone, Utc};
 use opentelemetry_proto::tonic::trace::v1::Span;
@@ -63,8 +63,9 @@ impl SpanClassifier {
             (span.end_time_unix_nano - span.start_time_unix_nano) as f64 / 1_000_000.0;
 
         // Extract service info from resource attributes
-        let service_name = AttributeExtractor::get_string(resource_attrs, semconv::service::SERVICE_NAME)
-            .unwrap_or_else(|| "unknown".to_string());
+        let service_name =
+            AttributeExtractor::get_string(resource_attrs, semconv::service::SERVICE_NAME)
+                .unwrap_or_else(|| "unknown".to_string());
         let service_version =
             AttributeExtractor::get_string(resource_attrs, semconv::service::SERVICE_VERSION);
 
@@ -136,9 +137,10 @@ impl SpanClassifier {
         let host = &span.server_address;
 
         // Check if host is in internal list
-        !self.internal_hosts.iter().any(|internal| {
-            host.contains(internal) || internal.contains(host)
-        })
+        !self
+            .internal_hosts
+            .iter()
+            .any(|internal| host.contains(internal) || internal.contains(host))
     }
 
     /// Convert nanoseconds timestamp to DateTime

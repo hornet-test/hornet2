@@ -4,10 +4,10 @@
 
 use crate::tracer::{OtlpReceiver, TraceStore, TracerConfig};
 use axum::{
+    Json,
     extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
-    Json,
 };
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -231,7 +231,12 @@ pub async fn list_sessions(State(state): State<TraceState>) -> impl IntoResponse
                 })
                 .collect();
 
-            (StatusCode::OK, Json(ListSessionsResponse { sessions: responses }))
+            (
+                StatusCode::OK,
+                Json(ListSessionsResponse {
+                    sessions: responses,
+                }),
+            )
         }
         Err(e) => {
             tracing::error!("Failed to list sessions: {}", e);
@@ -260,7 +265,10 @@ pub async fn get_session(
                 incoming_requests: session.statistics.incoming_requests,
                 outgoing_requests: session.statistics.outgoing_requests,
             };
-            (StatusCode::OK, Json(serde_json::to_value(response).unwrap()))
+            (
+                StatusCode::OK,
+                Json(serde_json::to_value(response).unwrap()),
+            )
         }
         Ok(None) => (
             StatusCode::NOT_FOUND,
@@ -404,7 +412,10 @@ pub fn trace_router(state: TraceState) -> axum::Router {
     axum::Router::new()
         // Session management
         .route("/sessions", get(list_sessions).post(start_session))
-        .route("/sessions/active", get(get_active_session).delete(stop_session))
+        .route(
+            "/sessions/active",
+            get(get_active_session).delete(stop_session),
+        )
         .route(
             "/sessions/{session_id}",
             get(get_session).delete(delete_session),
